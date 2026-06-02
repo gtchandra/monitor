@@ -1,0 +1,34 @@
+location: "Bologna"
+refresh_seconds: 60
+home_md_path: "./home.md"
+
+news_feeds:
+  - url: "https://feeds.bbci.co.uk/news/world/rss.xml"
+    label: "BBC"
+  - url: "https://hnrss.org/frontpage"
+    label: "HN"
+news_max_items: 5
+
+stocks:
+  - symbol: "ASML"
+    label: "ASML"
+  - symbol: "NVDA"
+    label: "NVIDIA"
+  - symbol: "MU"
+    label: "MICRON"
+  - symbol: "RPI.L"
+    label: "RASPBERRY PI"
+  - symbol: "STMPA.PA"
+    label: "STM"
+
+# serial/telex-style character-by-character typing reveal
+typing:
+  cps: 45            # characters per second printed
+  jitter: 0.7        # 0 = steady metronome, 1 = ragged per-character timing
+  lf_pause_ms: 150   # extra pause (ms) when the print head starts a new line
+
+# end-of-cycle "video memory corruption" glitch
+glitch:
+  idle_seconds: 10      # pause at the bottom (read time) before the glitch fires
+  duration_seconds: 7   # how long the glitch runs before the page reloads
+  churn_ms: 120         # interval between cell mutations (lower = busier flicker)

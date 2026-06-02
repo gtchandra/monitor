@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1024">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<title>typing test</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: #000;
+    color: #FFB000;
+    font-family: 'Menlo', 'Courier New', monospace;
+    font-size: 22px;
+    line-height: 1.5;
+    padding: 59px 18px 14px;
+  }
+
+  .bar {
+    background: #FFB000;
+    color: #000;
+    padding: 6px 18px;
+    letter-spacing: 1px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 10;
+  }
+  .bar-sep  { margin: 0 10px; }
+
+  .section { margin-bottom: 14px; }
+  .section-title {
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    font-size: 0.85em;
+    margin-bottom: 6px;
+    display: -webkit-box;
+    display: flex;
+    -webkit-box-align: center;
+    align-items: center;
+    gap: 8px;
+  }
+  .section-title::before { content: "["; color: #CC8800; }
+  .section-title::after  { content: "]"; color: #CC8800; }
+  .section-title-line {
+    -webkit-box-flex: 1;
+    flex: 1;
+    height: 1px;
+    background: #CC8800;
+    display: inline-block;
+  }
+  .news-item { padding: 1px 0; }
+  .stocks-line { line-height: 1.8; }
+  .stock-sep { color: #CC8800; margin: 0 12px; }
+
+  /* lines stay invisible until the serial stream reaches them */
+  .line { opacity: 0; }
+  .line.on { opacity: 1; }
+
+  /* teletype cursor */
+  #cur { background: #FFB000; color: #FFB000; }
+  @-webkit-keyframes curblink { 0%,50% { opacity: 1; } 51%,100% { opacity: 0; } }
+  @keyframes curblink { 0%,50% { opacity: 1; } 51%,100% { opacity: 0; } }
+  #cur.blink { -webkit-animation: curblink 0.5s steps(1) infinite; animation: curblink 0.5s steps(1) infinite; }
+</style>
+</head>
+<body>
+
+<div class="bar line">Sun 31 May 2026 ■ 14:07<span class="bar-sep">■</span>17°C  Partly cloudy<span class="bar-sep">■</span>Bologna</div>
+
+<div class="section">
+  <div class="section-title line">news<span class="section-title-line"></span></div>
+  <div class="news-item line">▞ Markets steady as central banks hold rates through the summer</div>
+  <div class="news-item line">▞ New deep-sea cable promises lower latency between continents</div>
+  <div class="news-item line">▞ Researchers demonstrate room-temperature data storage breakthrough</div>
+</div>
+
+<div class="section">
+  <div class="section-title line">stocks<span class="section-title-line"></span></div>
+  <div class="stocks-line line">ASML: 642.10 +1.2%<span class="stock-sep">|</span>NVIDIA: 118.44 +0.8%<span class="stock-sep">|</span>MICRON: 91.07 -0.4%</div>
+</div>
+
+<div class="section">
+  <div class="section-title line">home<span class="section-title-line"></span></div>
+  <div class="line">▞ Standup at 09:30 — bring the deploy notes</div>
+  <div class="line">▞ Dentist Thursday 16:00</div>
+  <div class="line">▞ Remember: water the plants on the balcony</div>
+</div>
+
+<script>
+(function() {
+  // ── tunables (override via URL, e.g. ?cps=20&jitter=0.7) ──
+  function qp(name, def) {
+    var m = location.search.match(new RegExp("[?&]" + name + "=([^&]+)"));
+    return m ? parseFloat(m[1]) : def;
+  }
+  var CPS    = qp("cps", 45);      // characters per second (telex ~6, this is faster/watchable)
+  var JITTER = qp("jitter", 0.6);  // 0..1 — per-char random variation in delay
+  var LFPAUSE = qp("lf", 180);     // extra ms when moving to a new line (carriage-return travel)
+  var base = 1000 / CPS;
+
+  // collect text nodes in document order, remember their owning .line, then blank them
+  var walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null, false);
+  var chunks = [], node;
+  while ((node = walker.nextNode())) {
+    if (!node.nodeValue.replace(/\s/g, "").length) continue;   // skip whitespace-only
+    var line = node.parentNode;
+    while (line && line.className && line.className.indexOf("line") === -1) line = line.parentNode;
+    chunks.push({ node: node, text: node.nodeValue, line: line });
+    node.nodeValue = "";
+  }
+
+  var cur = document.createElement("span");
+  cur.id = "cur";
+  cur.appendChild(document.createTextNode("█"));
+
+  var ci = 0, pos = 0, lastLine = null;
+
+  function tick() {
+    if (ci >= chunks.length) { cur.parentNode && cur.parentNode.removeChild(cur); return; }
+    var c = chunks[ci];
+    var newLine = false;
+
+    if (pos === 0) {
+      if (c.line) c.line.className += " on";
+      // park the cursor right after this text node
+      c.node.parentNode.insertBefore(cur, c.node.nextSibling);
+      cur.className = "";            // solid (typing) — only blinks when idle
+      newLine = (c.line !== lastLine);
+      lastLine = c.line;
+    }
+
+    c.node.nodeValue += c.text.charAt(pos);
+    pos++;
+
+    if (pos >= c.text.length) { ci++; pos = 0; }
+
+    var d = base * (1 - JITTER + Math.random() * JITTER * 2);
+    if (newLine) d += LFPAUSE;
+    setTimeout(tick, d);
+  }
+
+  tick();
+})();
+</script>
+</body>
+</html>

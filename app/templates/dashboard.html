@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<script>history.scrollRestoration = 'manual'; window.scrollTo(0, 0);</script>
+<meta name="viewport" content="width=1024">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<title>monitor</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: #000;
+    color: #FFB000;
+    font-family: 'Menlo', 'Courier New', monospace;
+    font-size: 22px;
+    line-height: 1.5;
+    padding: 59px 18px 14px;
+  }
+
+  /* ── top status bar ── */
+  .bar {
+    background: #FFB000;
+    color: #000;
+    padding: 6px 18px;
+    letter-spacing: 1px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 10;
+  }
+  .bar-sep  { margin: 0 10px; }
+
+  /* ── section headers ── */
+  .section { margin-bottom: 14px; }
+
+  .section-title {
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    font-size: 0.85em;
+    margin-bottom: 6px;
+    display: -webkit-box;
+    display: flex;
+    -webkit-box-align: center;
+    align-items: center;
+    gap: 8px;
+  }
+  .section-title::before { content: "["; color: #CC8800; }
+  .section-title::after  { content: "]"; color: #CC8800; }
+  .section-title-line {
+    -webkit-box-flex: 1;
+    flex: 1;
+    height: 1px;
+    background: #CC8800;
+    display: inline-block;
+  }
+
+  /* ── news ── */
+  .news-item {
+    padding: 1px 0;
+  }
+
+  /* ── stocks ── */
+  .stocks-line { line-height: 1.8; }
+  .stock-sep { color: #CC8800; margin: 0 12px; }
+  .stock-change.up   { color: #FFB000; }
+  .stock-change.down { color: #CC8800; }
+
+  /* ── home section (plain text, one line per source line) ── */
+  .home-line { padding: 1px 0; min-height: 1.5em; }
+
+  .unavailable { color: #CC8800; font-style: normal; }
+
+  /* ── serial/telex typing reveal ── */
+  /* lines stay invisible until the print head reaches them */
+  .line { opacity: 0; }
+  .line.on { opacity: 1; }
+  /* teletype print-head cursor (solid amber block) */
+  #cur { background: #FFB000; color: #FFB000; }
+
+  /* ── video-memory corruption glitch ── */
+  #glitch {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: #000;
+    color: #FFB000;
+    overflow: hidden;
+    white-space: pre;
+    z-index: 9999;
+    letter-spacing: 0;
+  }
+  /* 8 amber brightness levels: nX = normal text colour, rX = reverse-video background */
+  #glitch .n0 { color: #4D3500; } #glitch .r0 { background: #4D3500; color: #000; }
+  #glitch .n1 { color: #664600; } #glitch .r1 { background: #664600; color: #000; }
+  #glitch .n2 { color: #805800; } #glitch .r2 { background: #805800; color: #000; }
+  #glitch .n3 { color: #996A00; } #glitch .r3 { background: #996A00; color: #000; }
+  #glitch .n4 { color: #B37B00; } #glitch .r4 { background: #B37B00; color: #000; }
+  #glitch .n5 { color: #CC8D00; } #glitch .r5 { background: #CC8D00; color: #000; }
+  #glitch .n6 { color: #E69E00; } #glitch .r6 { background: #E69E00; color: #000; }
+  #glitch .n7 { color: #FFB000; } #glitch .r7 { background: #FFB000; color: #000; }
+  @-webkit-keyframes gblink { 0%,50% { opacity: 1; } 51%,100% { opacity: 0; } }
+  @keyframes gblink { 0%,50% { opacity: 1; } 51%,100% { opacity: 0; } }
+  #glitch .b {  /* blink (combined with an nX colour class) */
+    -webkit-animation: gblink 0.2s steps(1) infinite;
+    animation: gblink 0.2s steps(1) infinite;
+  }
+</style>
+</head>
+<body>
+
+{% set ns = namespace(total=0) %}
+{% macro delay() %}{% set ns.total = ns.total + randms() %}style="-webkit-animation-delay:{{ '%.2f' % ns.total }}s;animation-delay:{{ '%.2f' % ns.total }}s"{% endmacro %}
+
+<!-- STATUS BAR -->
+<div class="bar line" {{ delay() }}>
+  {{ bar_time }}<span class="bar-sep">■</span>{{ bar_weather }}<span class="bar-sep">■</span>{{ location }}
+</div>
+
+<!-- NEWS -->
+<div class="section">
+  <div class="section-title line" {{ delay() }}>news<span class="section-title-line"></span></div>
+  {% if headlines %}
+    {% for item in headlines %}
+    <div class="news-item line" {{ delay() }}>
+▞ {{ item.title }}
+    </div>
+    {% endfor %}
+  {% else %}
+    <span class="unavailable line" {{ delay() }}>[unavailable]</span>
+  {% endif %}
+</div>
+
+<!-- STOCKS -->
+<div class="section">
+  <div class="section-title line" {{ delay() }}>stocks<span class="section-title-line"></span></div>
+  {% if stock_quotes %}
+  <div class="stocks-line line" {{ delay() }}>
+    {% for s in stock_quotes %}{% if not loop.first %}<span class="stock-sep">|</span>{% endif %}{% if s.error %}{{ s.label }}: [n/a]{% else %}{{ s.label }}: {{ s.price }} <span class="stock-change {% if s.change >= 0 %}up{% else %}down{% endif %}">{% if s.change >= 0 %}+{% endif %}{{ s.pct }}%</span>{% endif %}{% endfor %}
+  </div>
+  {% else %}
+    <span class="unavailable line" {{ delay() }}>[unavailable]</span>
+  {% endif %}
+</div>
+
+<!-- HOME -->
+<div class="section">
+  {% if home_lines %}
+    {% for ln in home_lines %}
+    {% if ln.lstrip().startswith('#') %}
+    <div class="section-title line" {{ delay() }}>{{ ln.lstrip('# ').rstrip() }}<span class="section-title-line"></span></div>
+    {% else %}
+    <div class="home-line line" {{ delay() }}>{{ ln }}</div>
+    {% endif %}
+    {% endfor %}
+  {% else %}
+    <span class="unavailable line" {{ delay() }}>[no data — write to home.md]</span>
+  {% endif %}
+</div>
+
+<script>
+(function() {
+  var lineH = Math.round(22 * 1.5);
+
+  // config-driven timings (injected by server.py from config.yaml)
+  var CPS = {{ typing_cps }};            // characters per second
+  var JITTER = {{ typing_jitter }};      // 0 steady .. 1 ragged
+  var LFPAUSE = {{ typing_lf }};         // extra ms on a new line
+  var GLITCH_IDLE = {{ glitch_idle }} * 1000;
+  var GLITCH_DUR = {{ glitch_duration }} * 1000;
+  var GLITCH_CHURN = {{ glitch_churn }};
+  var base = 1000 / CPS;
+
+  // ── video-memory corruption glitch ──
+  // mostly simple ASCII (no < > & — they'd break innerHTML) plus a little block texture
+  var GLYPHS = "ABCDEFGHJKLMNPQRSTUVWXYZ0123456789@#%*+=/\\[]{}()|;:.,!?-_~^abcdefghkmnpqrstuvwxyz█▓▒░▌▐";
+  function rndGlyph() { return GLYPHS.charAt(Math.floor(Math.random() * GLYPHS.length)); }
+  function rndLevel() { return Math.floor(Math.random() * 8); }           // 0 dim .. 7 bright
+  function rndMode() {  // "n" normal, "r" reverse (lots), "b" blink (rare)
+    var rv = Math.random();
+    return rv < 0.03 ? "b" : (rv < 0.42 ? "r" : "n");
+  }
+  function cellClass(m, l) {
+    return m === "r" ? ("r" + l) : (m === "b" ? ("b n" + l) : ("n" + l));
+  }
+
+  var grid = null, gRows = 0, gCols = 0;
+
+  function buildGrid() {
+    gCols = Math.ceil(window.innerWidth / 13) + 2;
+    gRows = Math.ceil(window.innerHeight / lineH) + 1;
+    grid = [];
+    for (var y = 0; y < gRows; y++) {
+      var row = [], m = rndMode(), l = rndLevel();   // "sticky" runs of mode+brightness
+      for (var x = 0; x < gCols; x++) {
+        if (Math.random() < 0.30) m = rndMode();
+        if (Math.random() < 0.30) l = rndLevel();
+        row.push({ ch: rndGlyph(), m: m, l: l, c: cellClass(m, l) });
+      }
+      grid.push(row);
+    }
+  }
+
+  function mutate() {  // only a few cells change each tick — the rest stay frozen
+    var n = Math.max(6, Math.round(gRows * gCols * 0.012));
+    for (var i = 0; i < n; i++) {
+      var cell = grid[Math.floor(Math.random() * gRows)][Math.floor(Math.random() * gCols)];
+      cell.ch = rndGlyph();
+      if (Math.random() < 0.3) { cell.m = rndMode(); cell.l = rndLevel(); cell.c = cellClass(cell.m, cell.l); }
+    }
+  }
+
+  function render() {
+    var out = [];
+    for (var y = 0; y < gRows; y++) {
+      var row = grid[y], line = "", cls = "", open = false;
+      for (var x = 0; x < gCols; x++) {
+        var cell = row[x];
+        if (cell.c !== cls) {
+          if (open) { line += "</span>"; open = false; }
+          if (cell.c) { line += '<span class="' + cell.c + '">'; open = true; }
+          cls = cell.c;
+        }
+        line += cell.ch;
+      }
+      if (open) line += "</span>";
+      out.push(line);
+    }
+    return out.join("\n");
+  }
+
+  function startGlitch() {
+    buildGrid();
+    var el = document.createElement("div");
+    el.id = "glitch";
+    el.innerHTML = render();
+    document.body.appendChild(el);
+    var churn = setInterval(function() { mutate(); el.innerHTML = render(); }, GLITCH_CHURN);
+    setTimeout(function() { clearInterval(churn); location.reload(); }, GLITCH_DUR);
+  }
+
+  // ── serial/telex typing reveal ──
+  // collect text nodes in document order, remember their owning .line, then blank them
+  var walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null, false);
+  var chunks = [], tn;
+  while ((tn = walker.nextNode())) {
+    if (!tn.nodeValue.replace(/\s/g, "").length) continue;                  // skip whitespace-only
+    var p = tn.parentNode;
+    if (p && (p.nodeName === "SCRIPT" || p.nodeName === "STYLE")) continue;  // skip our own code
+    // climb to the nearest ancestor carrying the "line" class (past classless h2/p/ul/li)
+    var line = p;
+    while (line && line.nodeType === 1 && (" " + (line.className || "") + " ").indexOf(" line ") === -1) {
+      line = line.parentNode;
+    }
+    if (!line || line.nodeType !== 1) line = null;
+    chunks.push({ node: tn, text: tn.nodeValue, line: line });
+    tn.nodeValue = "";
+  }
+
+  var cur = document.createElement("span");
+  cur.id = "cur";
+  cur.appendChild(document.createTextNode("█"));
+
+  var ci = 0, pos = 0, lastLine = null;
+
+  function type() {
+    if (ci >= chunks.length) {
+      if (cur.parentNode) cur.parentNode.removeChild(cur);
+      setTimeout(startGlitch, GLITCH_IDLE);   // read pause, then the glitch + reload
+      return;
+    }
+    var c = chunks[ci], newLine = false;
+
+    if (pos === 0) {
+      if (c.line && c.line.className.indexOf(" on") === -1) c.line.className += " on";
+      c.node.parentNode.insertBefore(cur, c.node.nextSibling);   // park cursor at write head
+      newLine = (c.line !== lastLine);
+      lastLine = c.line;
+      // follow the print head: scroll down a few lines when it nears the bottom
+      var cb = cur.getBoundingClientRect().bottom;
+      if (cb > window.innerHeight - lineH) {
+        window.scrollTo(0, (window.pageYOffset || 0) + (cb - window.innerHeight) + lineH * 4);
+      }
+    }
+
+    c.node.nodeValue += c.text.charAt(pos);
+    pos++;
+    if (pos >= c.text.length) { ci++; pos = 0; }
+
+    var d = base * (1 - JITTER + Math.random() * JITTER * 2);
+    if (newLine) d += LFPAUSE;
+    setTimeout(type, d);
+  }
+
+  type();
+})();
+</script>
+</body>
+</html>
