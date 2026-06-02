@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/check-staged-secrets.sh\"",
+            "if": "Bash(git commit*)",
+            "statusMessage": "Scanning staged changes for secrets/PII..."
+          }
+        ]
+      }
+    ]
+  }
+}

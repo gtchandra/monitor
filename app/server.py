@@ -23,6 +23,15 @@ def _read_home():
         return None
 
 
+def _is_quiet(hour, start, end):
+    """True if `hour` falls in the quiet window, which may wrap past midnight."""
+    if start == end:
+        return False
+    if start < end:
+        return start <= hour < end
+    return hour >= start or hour < end
+
+
 _static_dir = os.path.join(os.path.dirname(__file__), 'static')
 
 @app.route('/apple-touch-icon<path:suffix>.png')
@@ -33,6 +42,22 @@ def touch_icon(suffix):
 @app.route("/")
 def index():
     now = datetime.now()
+
+    crt = cfg.get("crt") or {}
+    quiet = cfg.get("quiet_hours") or {}
+    if quiet.get("enabled", True) and _is_quiet(now.hour, quiet.get("start", 22), quiet.get("end", 6)):
+        ss = cfg.get("screensaver") or {}
+        return render_template(
+            "screensaver.html",
+            ss_count=ss.get("count", 40),
+            ss_fade_min=ss.get("fade_min_seconds", 6),
+            ss_fade_max=ss.get("fade_max_seconds", 16),
+            ss_randomness=ss.get("randomness", 0.5),
+            crt_enabled=crt.get("enabled", True),
+            crt_opacity=crt.get("opacity", 0.25),
+            crt_gap=crt.get("gap_px", 2),
+        )
+
     bar_time = now.strftime("%a %d %b %Y ■ %H:%M")
 
     wx = weather.get(cfg["location"])
@@ -61,6 +86,10 @@ def index():
         glitch_idle=glitch.get("idle_seconds", 15),
         glitch_duration=glitch.get("duration_seconds", 5),
         glitch_churn=glitch.get("churn_ms", 120),
+        glitch_blank=glitch.get("blank_ratio", 0.4),
+        crt_enabled=crt.get("enabled", True),
+        crt_opacity=crt.get("opacity", 0.25),
+        crt_gap=crt.get("gap_px", 2),
     )
 
 

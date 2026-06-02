@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<script>history.scrollRestoration = 'manual'; window.scrollTo(0, 0);</script>
+<meta name="viewport" content="width=1024">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<title>monitor</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    height: 100%;
+    background: #000;
+    overflow: hidden;
+    font-family: 'Menlo', 'Courier New', monospace;
+    font-size: 22px;
+    line-height: 1.5;
+  }
+
+  /* phosphor field: absolutely-positioned decaying glyphs */
+  #field { position: fixed; top: 0; left: 0; right: 0; bottom: 0; }
+  #field span {
+    position: absolute;
+    white-space: pre;
+  }
+
+  /* same 8-level amber palette as the dashboard glitch: n0 dim → n7 bright */
+  .n0 { color: #4D3500; }
+  .n1 { color: #664600; }
+  .n2 { color: #805800; }
+  .n3 { color: #996A00; }
+  .n4 { color: #B37B00; }
+  .n5 { color: #CC8D00; }
+  .n6 { color: #E69E00; }
+  .n7 { color: #FFB000; }
+
+  /* static CRT scanlines (kept at night too, above the glyphs) */
+  #crt {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    z-index: 10000;
+    pointer-events: none;
+    background: repeating-linear-gradient(
+      to bottom,
+      rgba(0,0,0,{{ crt_opacity }}) 0px,
+      rgba(0,0,0,{{ crt_opacity }}) 1px,
+      transparent 1px,
+      transparent {{ crt_gap }}px);
+  }
+</style>
+</head>
+<body>
+
+<div id="field"></div>
+{% if crt_enabled %}<div id="crt"></div>{% endif %}
+
+<script>
+(function() {
+  var COUNT   = {{ ss_count }};
+  var FADEMIN = {{ ss_fade_min }} * 1000;   // ms
+  var FADEMAX = {{ ss_fade_max }} * 1000;   // ms
+  var RND     = {{ ss_randomness }};        // 0 even .. 1 ragged
+  var RELOAD  = 120000;                      // re-check the clock every 2 min → exit at wake hour
+
+  var COLW = 13, lineH = Math.round(22 * 1.5);   // monospace cell size (matches the glitch grid)
+  var GLYPHS = "ABCDEFGHJKLMNPQRSTUVWXYZ0123456789@#%*+=/\\[]{}()|;:.,!?-_~^abcdefghkmnpqrstuvwxyz█▓▒░▌▐";
+  var LEVELS = 8;                                 // n7 (brightest) down to n0 (dimmest)
+
+  var field = document.getElementById("field");
+
+  function rndGlyph() { return GLYPHS.charAt(Math.floor(Math.random() * GLYPHS.length)); }
+  function jitter(base) {  // base ± RND, never below ~15% of base
+    return Math.max(base * 0.15, base * (1 + (Math.random() * 2 - 1) * RND));
+  }
+
+  function spawn(initialDelay) {
+    var cols = Math.max(1, Math.floor(window.innerWidth / COLW));
+    var rows = Math.max(1, Math.floor(window.innerHeight / lineH));
+    var el = document.createElement("span");
+    el.style.left = (Math.floor(Math.random() * cols) * COLW) + "px";
+    el.style.top  = (Math.floor(Math.random() * rows) * lineH) + "px";
+    el.textContent = rndGlyph();
+    el.className = "n7";
+    el.style.visibility = "hidden";
+    field.appendChild(el);
+
+    // total fade time for THIS glyph (baseline + random within the configured range)
+    var total = FADEMIN + Math.random() * Math.max(0, FADEMAX - FADEMIN);
+    var step = total / LEVELS;
+    var level = LEVELS - 1;   // start at 7 (brightest)
+
+    function tick() {
+      if (level < 0) {              // fully decayed → remove and respawn elsewhere
+        if (el.parentNode) el.parentNode.removeChild(el);
+        spawn(0);
+        return;
+      }
+      el.style.visibility = "visible";
+      el.className = "n" + level;   // step the colour down the palette
+      el.textContent = rndGlyph();  // every colour change also changes the character
+      level--;
+      setTimeout(tick, jitter(step));
+    }
+
+    setTimeout(tick, initialDelay);
+  }
+
+  // stagger the initial population so they don't all flash on together
+  for (var i = 0; i < COUNT; i++) spawn(Math.random() * FADEMAX);
+
+  setTimeout(function() { location.reload(); }, RELOAD);
+})();
+</script>
+</body>
+</html>

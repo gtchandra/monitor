@@ -110,9 +110,26 @@
     -webkit-animation: gblink 0.2s steps(1) infinite;
     animation: gblink 0.2s steps(1) infinite;
   }
+
+  /* ── static CRT scanlines (fixed horizontal line texture) ── */
+  #crt {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    z-index: 10000;              /* above everything, including the glitch (9999) */
+    pointer-events: none;
+    background: repeating-linear-gradient(
+      to bottom,
+      rgba(0,0,0,{{ crt_opacity }}) 0px,
+      rgba(0,0,0,{{ crt_opacity }}) 1px,
+      transparent 1px,
+      transparent {{ crt_gap }}px);
+  }
+
 </style>
 </head>
 <body>
+
+{% if crt_enabled %}<div id="crt"></div>{% endif %}
 
 {% set ns = namespace(total=0) %}
 {% macro delay() %}{% set ns.total = ns.total + randms() %}style="-webkit-animation-delay:{{ '%.2f' % ns.total }}s;animation-delay:{{ '%.2f' % ns.total }}s"{% endmacro %}
@@ -174,6 +191,7 @@
   var GLITCH_IDLE = {{ glitch_idle }} * 1000;
   var GLITCH_DUR = {{ glitch_duration }} * 1000;
   var GLITCH_CHURN = {{ glitch_churn }};
+  var GLITCH_BLANK = {{ glitch_blank }};   // fraction of glitch cells left empty (black)
   var base = 1000 / CPS;
 
   // ── video-memory corruption glitch ──
@@ -188,6 +206,11 @@
   function cellClass(m, l) {
     return m === "r" ? ("r" + l) : (m === "b" ? ("b n" + l) : ("n" + l));
   }
+  // a blank cell carries a space AND no colour class, so reverse-video can't paint a solid block
+  function makeCell(m, l) {
+    if (Math.random() < GLITCH_BLANK) return { ch: " ", m: m, l: l, c: "" };
+    return { ch: rndGlyph(), m: m, l: l, c: cellClass(m, l) };
+  }
 
   var grid = null, gRows = 0, gCols = 0;
 
@@ -200,7 +223,7 @@
       for (var x = 0; x < gCols; x++) {
         if (Math.random() < 0.30) m = rndMode();
         if (Math.random() < 0.30) l = rndLevel();
-        row.push({ ch: rndGlyph(), m: m, l: l, c: cellClass(m, l) });
+        row.push(makeCell(m, l));
       }
       grid.push(row);
     }
@@ -210,8 +233,13 @@
     var n = Math.max(6, Math.round(gRows * gCols * 0.012));
     for (var i = 0; i < n; i++) {
       var cell = grid[Math.floor(Math.random() * gRows)][Math.floor(Math.random() * gCols)];
-      cell.ch = rndGlyph();
-      if (Math.random() < 0.3) { cell.m = rndMode(); cell.l = rndLevel(); cell.c = cellClass(cell.m, cell.l); }
+      if (Math.random() < GLITCH_BLANK) {            // re-roll some cells to empty each tick
+        cell.ch = " "; cell.c = "";
+      } else {
+        cell.ch = rndGlyph();
+        if (cell.c === "" || Math.random() < 0.3) { cell.m = rndMode(); cell.l = rndLevel(); }
+        cell.c = cellClass(cell.m, cell.l);          // restore a class (un-blank) so the glyph shows
+      }
     }
   }
 
