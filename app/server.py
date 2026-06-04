@@ -54,8 +54,7 @@ def index():
             ss_fade_max=ss.get("fade_max_seconds", 16),
             ss_randomness=ss.get("randomness", 0.5),
             crt_enabled=crt.get("enabled", True),
-            crt_opacity=crt.get("opacity", 0.25),
-            crt_gap=crt.get("gap_px", 2),
+            crt_blur=crt.get("blur_px", 0.7),
         )
 
     bar_time = now.strftime("%a %d %b %Y ■ %H:%M")
@@ -88,8 +87,7 @@ def index():
         glitch_churn=glitch.get("churn_ms", 120),
         glitch_blank=glitch.get("blank_ratio", 0.4),
         crt_enabled=crt.get("enabled", True),
-        crt_opacity=crt.get("opacity", 0.25),
-        crt_gap=crt.get("gap_px", 2),
+        crt_blur=crt.get("blur_px", 0.7),
     )
 
 

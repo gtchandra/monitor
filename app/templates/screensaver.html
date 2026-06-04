@@ -20,8 +20,15 @@
     line-height: 1.5;
   }
 
+  /* CRT softness: a gentle blur over the glyph field */
+  :root { --crt-blur: {% if crt_enabled %}{{ crt_blur }}{% else %}0{% endif %}px; }
+
   /* phosphor field: absolutely-positioned decaying glyphs */
-  #field { position: fixed; top: 0; left: 0; right: 0; bottom: 0; }
+  #field {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    -webkit-filter: blur(var(--crt-blur));
+    filter: blur(var(--crt-blur));
+  }
   #field span {
     position: absolute;
     white-space: pre;
@@ -37,25 +44,11 @@
   .n6 { color: #E69E00; }
   .n7 { color: #FFB000; }
 
-  /* static CRT scanlines (kept at night too, above the glyphs) */
-  #crt {
-    position: fixed;
-    top: 0; left: 0; right: 0; bottom: 0;
-    z-index: 10000;
-    pointer-events: none;
-    background: repeating-linear-gradient(
-      to bottom,
-      rgba(0,0,0,{{ crt_opacity }}) 0px,
-      rgba(0,0,0,{{ crt_opacity }}) 1px,
-      transparent 1px,
-      transparent {{ crt_gap }}px);
-  }
 </style>
 </head>
 <body>
 
 <div id="field"></div>
-{% if crt_enabled %}<div id="crt"></div>{% endif %}
 
 <script>
 (function() {

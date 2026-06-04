@@ -23,22 +23,21 @@ stocks:
 
 # serial/telex-style character-by-character typing reveal
 typing:
-  cps: 45            # characters per second printed
+  cps: 65            # characters per second printed
   jitter: 0.7        # 0 = steady metronome, 1 = ragged per-character timing
   lf_pause_ms: 150   # extra pause (ms) when the print head starts a new line
 
-# static CRT scanlines (fixed horizontal line texture overlaying everything)
+# CRT softness: a gentle blur over the rendered content (replaces the old scanlines)
 crt:
-  enabled: true
-  opacity: 0.70   # darkness of each black line (0 = invisible, 1 = solid)
-  gap_px: 2       # period: 1px black line + (gap-1)px transparent
+  enabled: false
+  blur_px: 0.3    # 0 = sharp; ~0.6–1.0 = soft phosphor look
 
 # end-of-cycle "video memory corruption" glitch
 glitch:
   idle_seconds: 10      # pause at the bottom (read time) before the glitch fires
   duration_seconds: 7   # how long the glitch runs before the page reloads
-  churn_ms: 120         # interval between cell mutations (lower = busier flicker)
-  blank_ratio: 0.4      # fraction of cells left empty (black) so the field isn't solid
+  churn_ms: 220         # interval between cell mutations (lower = busier flicker)
+  blank_ratio: 0.5      # fraction of cells left empty (black) so the field isn't solid
 
 # night-time quiet hours: dashboard activity stops, phosphor-decay screensaver runs
 quiet_hours:

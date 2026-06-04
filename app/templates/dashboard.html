@@ -111,25 +111,16 @@
     animation: gblink 0.2s steps(1) infinite;
   }
 
-  /* ── static CRT scanlines (fixed horizontal line texture) ── */
-  #crt {
-    position: fixed;
-    top: 0; left: 0; right: 0; bottom: 0;
-    z-index: 10000;              /* above everything, including the glitch (9999) */
-    pointer-events: none;
-    background: repeating-linear-gradient(
-      to bottom,
-      rgba(0,0,0,{{ crt_opacity }}) 0px,
-      rgba(0,0,0,{{ crt_opacity }}) 1px,
-      transparent 1px,
-      transparent {{ crt_gap }}px);
-  }
+  /* ── CRT softness: a gentle blur over the rendered content ── */
+  :root { --crt-blur: {% if crt_enabled %}{{ crt_blur }}{% else %}0{% endif %}px; }
+  /* applied per top-level element (not body) so the fixed bar/glitch keep their positioning */
+  .bar     { -webkit-filter: blur(var(--crt-blur)); filter: blur(var(--crt-blur)); }
+  #content { -webkit-filter: blur(var(--crt-blur)); filter: blur(var(--crt-blur)); }
+  #glitch  { -webkit-filter: blur(var(--crt-blur)); filter: blur(var(--crt-blur)); }
 
 </style>
 </head>
 <body>
-
-{% if crt_enabled %}<div id="crt"></div>{% endif %}
 
 {% set ns = namespace(total=0) %}
 {% macro delay() %}{% set ns.total = ns.total + randms() %}style="-webkit-animation-delay:{{ '%.2f' % ns.total }}s;animation-delay:{{ '%.2f' % ns.total }}s"{% endmacro %}
@@ -139,13 +130,15 @@
   {{ bar_time }}<span class="bar-sep">■</span>{{ bar_weather }}<span class="bar-sep">■</span>{{ location }}
 </div>
 
+<div id="content">
+
 <!-- NEWS -->
 <div class="section">
   <div class="section-title line" {{ delay() }}>news<span class="section-title-line"></span></div>
   {% if headlines %}
     {% for item in headlines %}
     <div class="news-item line" {{ delay() }}>
-▞ {{ item.title }}
+- {{ item.title }}
     </div>
     {% endfor %}
   {% else %}
@@ -179,6 +172,8 @@
     <span class="unavailable line" {{ delay() }}>[no data — write to home.md]</span>
   {% endif %}
 </div>
+
+</div><!-- /#content -->
 
 <script>
 (function() {
