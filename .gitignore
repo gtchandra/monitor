@@ -11,3 +11,6 @@ wheels/
 
 # Personal home panel content
 home.md
+
+# Personal recurring-task data (names live here; repo is public)
+tasks.json

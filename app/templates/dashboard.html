@@ -118,9 +118,54 @@
   #content { -webkit-filter: blur(var(--crt-blur)); filter: blur(var(--crt-blur)); }
   #glitch  { -webkit-filter: blur(var(--crt-blur)); filter: blur(var(--crt-blur)); }
 
+  /* ── recurring-task overlay ("message from system:") ── */
+  #tasks {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    z-index: 500;                /* above content, below the glitch (9999) */
+    pointer-events: none;        /* taps pass through except on the box */
+  }
+  .tasks-box {                   /* transform-centred (works on old iOS Safari; no flexbox) */
+    position: absolute;
+    top: 50%; left: 50%;
+    -webkit-transform: translate(-50%, -50%);
+    transform: translate(-50%, -50%);
+    pointer-events: auto;
+    background: rgba(0,0,0,0.6);
+    border: 1px solid #FFB000;
+    padding: 22px 26px;
+    max-width: 80%;
+    text-align: center;
+  }
+  .tasks-title {
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    font-size: 0.85em;
+    color: #CC8800;
+    margin-bottom: 12px;
+  }
+  .task-row { margin-bottom: 18px; }
+  .task-done {
+    font: inherit;
+    color: #000;
+    background: #FFB000;
+    border: none;
+    padding: 6px 18px;
+    letter-spacing: 2px;
+    cursor: pointer;
+  }
+  .task-done:active { background: #CC8800; }
+
 </style>
 </head>
 <body>
+
+{% if due_task %}
+<div id="tasks"><div class="tasks-box">
+  <div class="tasks-title">message from system:</div>
+  <div class="task-row">{{ due_task.label }}</div>
+  <button class="task-done" data-id="{{ due_task.id }}">[ DONE ]</button>
+</div></div>
+{% endif %}
 
 {% set ns = namespace(total=0) %}
 {% macro delay() %}{% set ns.total = ns.total + randms() %}style="-webkit-animation-delay:{{ '%.2f' % ns.total }}s;animation-delay:{{ '%.2f' % ns.total }}s"{% endmacro %}
@@ -187,6 +232,8 @@
   var GLITCH_DUR = {{ glitch_duration }} * 1000;
   var GLITCH_CHURN = {{ glitch_churn }};
   var GLITCH_BLANK = {{ glitch_blank }};   // fraction of glitch cells left empty (black)
+  var HAS_TASK = {% if due_task %}true{% else %}false{% endif %};   // a chore is awaiting acknowledgement
+  var TASK_REFRESH_MS = {{ refresh_seconds }} * 1000;               // plain reload cadence while a task is up
   var base = 1000 / CPS;
 
   // ── video-memory corruption glitch ──
@@ -275,6 +322,10 @@
     if (!tn.nodeValue.replace(/\s/g, "").length) continue;                  // skip whitespace-only
     var p = tn.parentNode;
     if (p && (p.nodeName === "SCRIPT" || p.nodeName === "STYLE")) continue;  // skip our own code
+    // skip the task overlay — it must show instantly with working buttons
+    var anc = p, inTasks = false;
+    while (anc && anc.nodeType === 1) { if (anc.id === "tasks") { inTasks = true; break; } anc = anc.parentNode; }
+    if (inTasks) continue;
     // climb to the nearest ancestor carrying the "line" class (past classless h2/p/ul/li)
     var line = p;
     while (line && line.nodeType === 1 && (" " + (line.className || "") + " ").indexOf(" line ") === -1) {
@@ -294,7 +345,13 @@
   function type() {
     if (ci >= chunks.length) {
       if (cur.parentNode) cur.parentNode.removeChild(cur);
-      setTimeout(startGlitch, GLITCH_IDLE);   // read pause, then the glitch + reload
+      if (HAS_TASK) {
+        // a chore is pending: skip the heavy glitch entirely so the DONE button stays
+        // reachable and the old iPad isn't churned. Just refresh quietly.
+        setTimeout(function() { location.reload(); }, TASK_REFRESH_MS);
+      } else {
+        setTimeout(startGlitch, GLITCH_IDLE);   // read pause, then the glitch + reload
+      }
       return;
     }
     var c = chunks[ci], newLine = false;
@@ -323,5 +380,28 @@
   type();
 })();
 </script>
+
+{% if due_task %}
+<script>
+// acknowledge the due task → stamp last_check server-side, then reload to show the next
+(function() {
+  var btn = document.querySelector("#tasks .task-done");
+  if (!btn) return;
+  btn.addEventListener("click", function() {
+    btn.disabled = true;
+    // XMLHttpRequest, not fetch() — old iPad Safari (iOS 9) has no fetch
+    var xhr = new XMLHttpRequest();
+    xhr.open("POST", "/task/" + encodeURIComponent(btn.getAttribute("data-id")) + "/done", true);
+    xhr.onreadystatechange = function() {
+      if (xhr.readyState !== 4) return;
+      if (xhr.status >= 200 && xhr.status < 300) { location.reload(); }
+      else { btn.disabled = false; }
+    };
+    xhr.send();
+  });
+})();
+</script>
+{% endif %}
+
 </body>
 </html>

@@ -1,0 +1,8 @@
+{
+  "tasks": [
+    { "id": "cat-fountain", "label": "Clean the cat fountain", "interval_days": 30, "last_check": null },
+    { "id": "litter-alex", "label": "Clean the cat litter — Alex", "interval_days": 3, "last_check": "2026-06-06" },
+    { "id": "litter-sam", "label": "Clean the cat litter — Sam", "interval_days": 3, "last_check": "2026-06-07" },
+    { "id": "litter-jo", "label": "Clean the cat litter — Jo", "interval_days": 3, "last_check": "2026-06-08" }
+  ]
+}

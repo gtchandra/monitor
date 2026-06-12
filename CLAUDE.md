@@ -31,4 +31,6 @@ No tests or linter are configured.
 
 **Configuration:** `config.yaml` controls location, refresh interval, `home_md_path`, news feeds, and stock symbols. `home.md` is rendered as Markdown and injected into the dashboard as the "Home" section.
 
+**Recurring tasks:** `tasks.json` (gitignored; see `tasks-example.json`) holds chore tasks with `interval_days` + `last_check`. A task is due when `today - last_check >= interval_days`; `server.py` shows the first due task in a "message from system:" overlay, and `POST /task/<id>/done` stamps `last_check` to today. Rotation among people is modelled as separate tasks with staggered `last_check`.
+
 **Template:** `app/templates/dashboard.html` — pure Jinja2/CSS, no JS framework. Auto-refreshes every `refresh_seconds`. Staggered CSS animations are driven by `randms()` (a Jinja2 global set in `server.py`).

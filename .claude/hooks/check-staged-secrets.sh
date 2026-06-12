@@ -42,7 +42,8 @@ scan "OpenAI / sk- key"             'sk-[A-Za-z0-9]{20,}'
 scan "Private key in env var"       '(PRIVATE_KEY|SECRET_KEY|ACCESS_KEY)[[:space:]]*='
 
 # --- Personal information --------------------------------------------------
-scan "Email address"                '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}'
+# local-part must start alphanumeric → avoids matching diff-prefixed decorators like "+@app.route"
+scan "Email address"                '[A-Za-z0-9][A-Za-z0-9._%+-]*@[A-Za-z0-9.-]+\.[A-Za-z]{2,}'
 scan "Phone number"                 '(\+?[0-9]{1,3}[ .-]?)?\(?[0-9]{2,4}\)?[ .-]?[0-9]{3,4}[ .-]?[0-9]{3,4}'
 scan "Credit card number"           '\b([0-9]{4}[ -]?){3}[0-9]{4}\b'
 scan "IBAN"                          '\b[A-Z]{2}[0-9]{2}[ ]?([A-Z0-9]{4}[ ]?){2,7}[A-Z0-9]{1,4}\b'
