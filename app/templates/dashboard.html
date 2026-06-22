@@ -233,7 +233,6 @@
   var GLITCH_CHURN = {{ glitch_churn }};
   var GLITCH_BLANK = {{ glitch_blank }};   // fraction of glitch cells left empty (black)
   var HAS_TASK = {% if due_task %}true{% else %}false{% endif %};   // a chore is awaiting acknowledgement
-  var TASK_REFRESH_MS = {{ refresh_seconds }} * 1000;               // plain reload cadence while a task is up
   var base = 1000 / CPS;
 
   // ── video-memory corruption glitch ──
@@ -315,25 +314,24 @@
   }
 
   // ── serial/telex typing reveal ──
-  // collect text nodes in document order, remember their owning .line, then blank them
+  // collect text nodes in document order, remember their owning .line, then blank them.
+  // Skipped entirely when a task is pending (see the HAS_TASK branch at the bottom).
   var walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null, false);
   var chunks = [], tn;
-  while ((tn = walker.nextNode())) {
-    if (!tn.nodeValue.replace(/\s/g, "").length) continue;                  // skip whitespace-only
-    var p = tn.parentNode;
-    if (p && (p.nodeName === "SCRIPT" || p.nodeName === "STYLE")) continue;  // skip our own code
-    // skip the task overlay — it must show instantly with working buttons
-    var anc = p, inTasks = false;
-    while (anc && anc.nodeType === 1) { if (anc.id === "tasks") { inTasks = true; break; } anc = anc.parentNode; }
-    if (inTasks) continue;
-    // climb to the nearest ancestor carrying the "line" class (past classless h2/p/ul/li)
-    var line = p;
-    while (line && line.nodeType === 1 && (" " + (line.className || "") + " ").indexOf(" line ") === -1) {
-      line = line.parentNode;
+  if (!HAS_TASK) {
+    while ((tn = walker.nextNode())) {
+      if (!tn.nodeValue.replace(/\s/g, "").length) continue;                  // skip whitespace-only
+      var p = tn.parentNode;
+      if (p && (p.nodeName === "SCRIPT" || p.nodeName === "STYLE")) continue;  // skip our own code
+      // climb to the nearest ancestor carrying the "line" class (past classless h2/p/ul/li)
+      var line = p;
+      while (line && line.nodeType === 1 && (" " + (line.className || "") + " ").indexOf(" line ") === -1) {
+        line = line.parentNode;
+      }
+      if (!line || line.nodeType !== 1) line = null;
+      chunks.push({ node: tn, text: tn.nodeValue, line: line });
+      tn.nodeValue = "";
     }
-    if (!line || line.nodeType !== 1) line = null;
-    chunks.push({ node: tn, text: tn.nodeValue, line: line });
-    tn.nodeValue = "";
   }
 
   var cur = document.createElement("span");
@@ -345,13 +343,7 @@
   function type() {
     if (ci >= chunks.length) {
       if (cur.parentNode) cur.parentNode.removeChild(cur);
-      if (HAS_TASK) {
-        // a chore is pending: skip the heavy glitch entirely so the DONE button stays
-        // reachable and the old iPad isn't churned. Just refresh quietly.
-        setTimeout(function() { location.reload(); }, TASK_REFRESH_MS);
-      } else {
-        setTimeout(startGlitch, GLITCH_IDLE);   // read pause, then the glitch + reload
-      }
+      setTimeout(startGlitch, GLITCH_IDLE);   // read pause, then the glitch + reload
       return;
     }
     var c = chunks[ci], newLine = false;
@@ -377,7 +369,19 @@
     setTimeout(type, d);
   }
 
-  type();
+  if (HAS_TASK) {
+    // Task pending: reveal all content at once and DO NOTHING else — no typing, no
+    // scrolling, no glitch, no auto-reload. On the old iPad this keeps the fixed
+    // overlay's touch target from drifting (fixed + scroll desyncs on iOS 9) and
+    // avoids the memory churn from repeated reloads that was crashing the tab.
+    // The page stays static until the DONE tap reloads it.
+    var lns = document.querySelectorAll(".line");
+    for (var li = 0; li < lns.length; li++) {
+      if ((" " + lns[li].className + " ").indexOf(" on ") === -1) lns[li].className += " on";
+    }
+  } else {
+    type();
+  }
 })();
 </script>
 

@@ -3,7 +3,7 @@ import os
 import random
 import yaml
 from datetime import datetime, date
-from flask import Flask, render_template, send_from_directory
+from flask import Flask, render_template, send_from_directory, Response
 from fetchers import weather, news, stocks
 
 app = Flask(__name__)
@@ -57,6 +57,33 @@ def _first_due_task(today):
     return None
 
 
+def _feed_text():
+    """Dashboard content (news + stocks + home.md) as plain text, no markup."""
+    sections = []
+
+    headlines = news.get(cfg["news_feeds"], cfg.get("news_max_items", 10))
+    if headlines:
+        sections.append("\n".join(h["title"] for h in headlines))
+
+    quotes = stocks.get(cfg.get("stocks", []))
+    if quotes:
+        lines = []
+        for s in quotes:
+            if s.get("error"):
+                lines.append(f"{s['label']}: n/a")
+            else:
+                sign = "+" if s["change"] >= 0 else ""
+                lines.append(f"{s['label']}: {s['price']} ({sign}{s['pct']}%)")
+        sections.append("\n".join(lines))
+
+    home = _read_home()
+    if home:
+        cleaned = [ln.lstrip("#-* ").rstrip() for ln in home]
+        sections.append("\n".join(cleaned))
+
+    return "\n\n".join(sections) + "\n"
+
+
 def _is_quiet(hour, start, end):
     """True if `hour` falls in the quiet window, which may wrap past midnight."""
     if start == end:
@@ -71,6 +98,11 @@ _static_dir = os.path.join(os.path.dirname(__file__), 'static')
 @app.route('/apple-touch-icon<path:suffix>.png')
 def touch_icon(suffix):
     return send_from_directory(_static_dir, 'apple-touch-icon.png')
+
+
+@app.route("/feed.txt")
+def feed_txt():
+    return Response(_feed_text(), mimetype="text/plain")
 
 
 @app.route("/task/<task_id>/done", methods=["POST"])
