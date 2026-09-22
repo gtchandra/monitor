@@ -58,8 +58,10 @@ def _first_due_task(today):
 
 
 def _feed_text():
-    """Dashboard content (news + stocks + home.md) as plain text, no markup."""
-    sections = []
+    """Dashboard content (last update + news + stocks + home.md) as plain text, no markup."""
+    # Explicit freshness marker consumed by the Raspberry Pi typewriter client.
+    # Use local timezone and seconds precision so humans can read it too.
+    sections = [f"Last update: {datetime.now().astimezone().isoformat(timespec='seconds')}"]
 
     headlines = news.get(cfg["news_feeds"], cfg.get("news_max_items", 10))
     if headlines:
