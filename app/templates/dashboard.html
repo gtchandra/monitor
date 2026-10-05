@@ -104,19 +104,15 @@
   #glitch .n5 { color: #CC8D00; } #glitch .r5 { background: #CC8D00; color: #000; }
   #glitch .n6 { color: #E69E00; } #glitch .r6 { background: #E69E00; color: #000; }
   #glitch .n7 { color: #FFB000; } #glitch .r7 { background: #FFB000; color: #000; }
-  @-webkit-keyframes gblink { 0%,50% { opacity: 1; } 51%,100% { opacity: 0; } }
-  @keyframes gblink { 0%,50% { opacity: 1; } 51%,100% { opacity: 0; } }
-  #glitch .b {  /* blink (combined with an nX colour class) */
-    -webkit-animation: gblink 0.2s steps(1) infinite;
-    animation: gblink 0.2s steps(1) infinite;
-  }
 
+{% if crt_enabled %}
   /* ── CRT softness: a gentle blur over the rendered content ── */
-  :root { --crt-blur: {% if crt_enabled %}{{ crt_blur }}{% else %}0{% endif %}px; }
+  /* only emitted when enabled: any filter forces an offscreen layer repaint on old iPads */
   /* applied per top-level element (not body) so the fixed bar/glitch keep their positioning */
-  .bar     { -webkit-filter: blur(var(--crt-blur)); filter: blur(var(--crt-blur)); }
-  #content { -webkit-filter: blur(var(--crt-blur)); filter: blur(var(--crt-blur)); }
-  #glitch  { -webkit-filter: blur(var(--crt-blur)); filter: blur(var(--crt-blur)); }
+  .bar     { -webkit-filter: blur({{ crt_blur }}px); filter: blur({{ crt_blur }}px); }
+  #content { -webkit-filter: blur({{ crt_blur }}px); filter: blur({{ crt_blur }}px); }
+  #glitch  { -webkit-filter: blur({{ crt_blur }}px); filter: blur({{ crt_blur }}px); }
+{% endif %}
 
   /* ── recurring-task overlay ("message from system:") ── */
   #tasks {
@@ -232,28 +228,26 @@
   var GLITCH_DUR = {{ glitch_duration }} * 1000;
   var GLITCH_CHURN = {{ glitch_churn }};
   var GLITCH_BLANK = {{ glitch_blank }};   // fraction of glitch cells left empty (black)
+  var REFRESH_MS = {{ refresh_seconds }} * 1000;   // real reload (fresh data) only this often
   var HAS_TASK = {% if due_task %}true{% else %}false{% endif %};   // a chore is awaiting acknowledgement
+  var LOADED_AT = new Date().getTime();
   var base = 1000 / CPS;
+  var MIN_TICK = 40;   // ms; below this, print several characters per timer tick
 
   // ── video-memory corruption glitch ──
   // mostly simple ASCII (no < > & — they'd break innerHTML) plus a little block texture
   var GLYPHS = "ABCDEFGHJKLMNPQRSTUVWXYZ0123456789@#%*+=/\\[]{}()|;:.,!?-_~^abcdefghkmnpqrstuvwxyz█▓▒░▌▐";
   function rndGlyph() { return GLYPHS.charAt(Math.floor(Math.random() * GLYPHS.length)); }
   function rndLevel() { return Math.floor(Math.random() * 8); }           // 0 dim .. 7 bright
-  function rndMode() {  // "n" normal, "r" reverse (lots), "b" blink (rare)
-    var rv = Math.random();
-    return rv < 0.03 ? "b" : (rv < 0.42 ? "r" : "n");
-  }
-  function cellClass(m, l) {
-    return m === "r" ? ("r" + l) : (m === "b" ? ("b n" + l) : ("n" + l));
-  }
+  function rndMode() { return Math.random() < 0.4 ? "r" : "n"; }          // "n" normal, "r" reverse (lots)
+  function cellClass(m, l) { return m + l; }
   // a blank cell carries a space AND no colour class, so reverse-video can't paint a solid block
   function makeCell(m, l) {
     if (Math.random() < GLITCH_BLANK) return { ch: " ", m: m, l: l, c: "" };
     return { ch: rndGlyph(), m: m, l: l, c: cellClass(m, l) };
   }
 
-  var grid = null, gRows = 0, gCols = 0;
+  var grid = null, gRows = 0, gCols = 0, gEl = null, rowEls = [];
 
   function buildGrid() {
     gCols = Math.ceil(window.innerWidth / 13) + 2;
@@ -270,47 +264,66 @@
     }
   }
 
-  function mutate() {  // only a few cells change each tick — the rest stay frozen
-    var n = Math.max(6, Math.round(gRows * gCols * 0.012));
-    for (var i = 0; i < n; i++) {
-      var cell = grid[Math.floor(Math.random() * gRows)][Math.floor(Math.random() * gCols)];
-      if (Math.random() < GLITCH_BLANK) {            // re-roll some cells to empty each tick
-        cell.ch = " "; cell.c = "";
-      } else {
-        cell.ch = rndGlyph();
-        if (cell.c === "" || Math.random() < 0.3) { cell.m = rndMode(); cell.l = rndLevel(); }
-        cell.c = cellClass(cell.m, cell.l);          // restore a class (un-blank) so the glyph shows
+  // only a few rows change each tick; returns them so just those rows get re-rendered
+  function mutate() {
+    var dirty = {};
+    var perRow = Math.max(3, Math.round(gCols * 0.12));
+    for (var r = 0; r < 3; r++) {
+      var y = Math.floor(Math.random() * gRows);
+      dirty[y] = true;
+      for (var i = 0; i < perRow; i++) {
+        var cell = grid[y][Math.floor(Math.random() * gCols)];
+        if (Math.random() < GLITCH_BLANK) {            // re-roll some cells to empty each tick
+          cell.ch = " "; cell.c = "";
+        } else {
+          cell.ch = rndGlyph();
+          if (cell.c === "" || Math.random() < 0.3) { cell.m = rndMode(); cell.l = rndLevel(); }
+          cell.c = cellClass(cell.m, cell.l);          // restore a class (un-blank) so the glyph shows
+        }
       }
     }
+    return dirty;
   }
 
-  function render() {
-    var out = [];
-    for (var y = 0; y < gRows; y++) {
-      var row = grid[y], line = "", cls = "", open = false;
-      for (var x = 0; x < gCols; x++) {
-        var cell = row[x];
-        if (cell.c !== cls) {
-          if (open) { line += "</span>"; open = false; }
-          if (cell.c) { line += '<span class="' + cell.c + '">'; open = true; }
-          cls = cell.c;
-        }
-        line += cell.ch;
+  function renderRow(y) {
+    var row = grid[y], line = "", cls = "", open = false;
+    for (var x = 0; x < gCols; x++) {
+      var cell = row[x];
+      if (cell.c !== cls) {
+        if (open) { line += "</span>"; open = false; }
+        if (cell.c) { line += '<span class="' + cell.c + '">'; open = true; }
+        cls = cell.c;
       }
-      if (open) line += "</span>";
-      out.push(line);
+      line += cell.ch;
     }
-    return out.join("\n");
+    if (open) line += "</span>";
+    return line;
   }
 
   function startGlitch() {
     buildGrid();
-    var el = document.createElement("div");
-    el.id = "glitch";
-    el.innerHTML = render();
-    document.body.appendChild(el);
-    var churn = setInterval(function() { mutate(); el.innerHTML = render(); }, GLITCH_CHURN);
-    setTimeout(function() { clearInterval(churn); location.reload(); }, GLITCH_DUR);
+    gEl = document.createElement("div");
+    gEl.id = "glitch";
+    rowEls = [];
+    for (var y = 0; y < gRows; y++) {
+      var rowEl = document.createElement("div");
+      rowEl.innerHTML = renderRow(y);
+      gEl.appendChild(rowEl);
+      rowEls.push(rowEl);
+    }
+    document.body.appendChild(gEl);
+    var churn = setInterval(function() {
+      var dirty = mutate();
+      for (var y in dirty) rowEls[y].innerHTML = renderRow(y);
+    }, GLITCH_CHURN);
+    setTimeout(function() {
+      clearInterval(churn);
+      if (new Date().getTime() - LOADED_AT >= REFRESH_MS) { location.reload(); return; }
+      // data is still fresh enough: drop the glitch and replay the typing over the same DOM
+      document.body.removeChild(gEl);
+      gEl = null; rowEls = []; grid = null;
+      restartTyping();
+    }, GLITCH_DUR);
   }
 
   // ── serial/telex typing reveal ──
@@ -343,7 +356,7 @@
   function type() {
     if (ci >= chunks.length) {
       if (cur.parentNode) cur.parentNode.removeChild(cur);
-      setTimeout(startGlitch, GLITCH_IDLE);   // read pause, then the glitch + reload
+      setTimeout(startGlitch, GLITCH_IDLE);   // read pause, then the glitch (+ reload or replay)
       return;
     }
     var c = chunks[ci], newLine = false;
@@ -353,20 +366,37 @@
       c.node.parentNode.insertBefore(cur, c.node.nextSibling);   // park cursor at write head
       newLine = (c.line !== lastLine);
       lastLine = c.line;
-      // follow the print head: scroll down a few lines when it nears the bottom
-      var cb = cur.getBoundingClientRect().bottom;
-      if (cb > window.innerHeight - lineH) {
-        window.scrollTo(0, (window.pageYOffset || 0) + (cb - window.innerHeight) + lineH * 4);
+      if (newLine) {
+        // follow the print head: scroll down a few lines when it nears the bottom
+        // (measured only on a new line — getBoundingClientRect forces a synchronous layout)
+        var cb = cur.getBoundingClientRect().bottom;
+        if (cb > window.innerHeight - lineH) {
+          window.scrollTo(0, (window.pageYOffset || 0) + (cb - window.innerHeight) + lineH * 4);
+        }
       }
     }
 
-    c.node.nodeValue += c.text.charAt(pos);
-    pos++;
+    // fast rates print a few characters per tick: ~25 timers/s instead of one per character
+    var d = base * (1 - JITTER + Math.random() * JITTER * 2);
+    var n = Math.min(d < MIN_TICK ? Math.ceil(MIN_TICK / d) : 1, c.text.length - pos);
+    c.node.nodeValue += c.text.substr(pos, n);
+    pos += n;
     if (pos >= c.text.length) { ci++; pos = 0; }
 
-    var d = base * (1 - JITTER + Math.random() * JITTER * 2);
-    if (newLine) d += LFPAUSE;
-    setTimeout(type, d);
+    var wait = d * n;
+    if (newLine) wait += LFPAUSE;
+    setTimeout(type, wait);
+  }
+
+  function restartTyping() {
+    for (var i = 0; i < chunks.length; i++) {
+      chunks[i].node.nodeValue = "";
+      var ln = chunks[i].line;
+      if (ln) ln.className = ln.className.replace(/ on\b/g, "");
+    }
+    ci = 0; pos = 0; lastLine = null;
+    window.scrollTo(0, 0);
+    type();
   }
 
   if (HAS_TASK) {

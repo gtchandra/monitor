@@ -13,8 +13,8 @@ Served by Flask on port **5010**.
 - **News** — RSS headlines via `feedparser` (cached 5 min)
 - **Stocks** — quotes via `yfinance` (cached 15 min)
 - **Home** — a Markdown file (`home.md`) rendered into a custom panel
-- In-memory TTL cache that serves stale data on fetch errors rather than failing
-- Pure Jinja2/CSS front end — no JS framework; auto-refreshes on an interval
+- In-memory TTL cache that serves stale data immediately and refreshes in the background
+- Pure Jinja2/CSS front end with small ES5 scripts — tuned for first-gen iPad Mini (iOS 9)
 
 ## Requirements
 
@@ -43,13 +43,15 @@ All settings live in `config.yaml`:
 | Key | Description |
 | --- | --- |
 | `location` | City used for the weather lookup |
-| `refresh_seconds` | How often the dashboard auto-refreshes |
+| `refresh_seconds` | Minimum time between full page reloads; in between, the typing cycle replays in place |
 | `home_md_path` | Path to the Markdown file rendered in the Home panel |
 | `news_feeds` | List of `{url, label}` RSS feeds |
 | `news_max_items` | Max headlines shown |
 | `stocks` | List of `{symbol, label}` tickers |
 | `typing` | Serial/telex typing-reveal animation tuning |
 | `glitch` | End-of-cycle glitch animation tuning |
+| `crt` | Optional blur (costly on old iPads) |
+| `quiet_hours` / `screensaver` | Night-time phosphor screensaver window and tuning |
 
 ## Architecture
 
@@ -60,7 +62,7 @@ All settings live in `config.yaml`:
   - `weather.py` — wttr.in JSON API
   - `news.py` — RSS via `feedparser`
   - `stocks.py` — `yfinance`
-  - `cache.py` — shared in-memory TTL cache
+  - `cache.py` — shared in-memory TTL cache (stale-while-revalidate)
 - **`app/templates/dashboard.html`** — Jinja2 + CSS; staggered animations driven
   by a `randms()` Jinja2 global.
 

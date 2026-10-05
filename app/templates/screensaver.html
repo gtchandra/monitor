@@ -2,7 +2,67 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<script>history.scrollRestoration = 'manual'; window.scrollTo(0, 0);</script>
+<script>
+(function() {
+  var COUNT   = {{ ss_count }};
+  var FADEMIN = {{ ss_fade_min }} * 1000;   // ms
+  var FADEMAX = {{ ss_fade_max }} * 1000;   // ms
+  var RND     = {{ ss_randomness }};        // 0 even .. 1 ragged
+  var WAKE    = {{ ss_wake_ms }};           // ms until quiet hours end → reload into the dashboard
+  var SAFETY  = 3600000;                     // reload at least hourly in case the clock drifts
+  var TICK    = 250;                         // one shared timer drives every glyph
+
+  var COLW = 13, lineH = Math.round(22 * 1.5);   // monospace cell size (matches the glitch grid)
+  var GLYPHS = "ABCDEFGHJKLMNPQRSTUVWXYZ0123456789@#%*+=/\\[]{}()|;:.,!?-_~^abcdefghkmnpqrstuvwxyz█▓▒░▌▐";
+  var LEVELS = 8;                                 // n7 (brightest) down to n0 (dimmest)
+
+  var field = document.getElementById("field");
+  var cols = Math.max(1, Math.floor(window.innerWidth / COLW));
+  var rows = Math.max(1, Math.floor(window.innerHeight / lineH));
+
+  function now() { return new Date().getTime(); }
+  function rndGlyph() { return GLYPHS.charAt(Math.floor(Math.random() * GLYPHS.length)); }
+  function jitter(base) {  // base ± RND, never below ~15% of base
+    return Math.max(base * 0.15, base * (1 + (Math.random() * 2 - 1) * RND));
+  }
+
+  // fixed pool of spans, reused forever — no DOM nodes created or removed after start-up
+  function respawn(g, delay) {
+    g.el.style.visibility = "hidden";
+    g.el.style.left = (Math.floor(Math.random() * cols) * COLW) + "px";
+    g.el.style.top  = (Math.floor(Math.random() * rows) * lineH) + "px";
+    // total fade time for THIS glyph (baseline + random within the configured range)
+    g.step = (FADEMIN + Math.random() * Math.max(0, FADEMAX - FADEMIN)) / LEVELS;
+    g.level = LEVELS - 1;   // start at 7 (brightest)
+    g.next = now() + delay;
+  }
+
+  var pool = [];
+  for (var i = 0; i < COUNT; i++) {
+    var el = document.createElement("span");
+    field.appendChild(el);
+    var g = { el: el };
+    respawn(g, Math.random() * FADEMAX);   // stagger so they don't all flash on together
+    pool.push(g);
+  }
+
+  setInterval(function() {
+    var t = now();
+    for (var i = 0; i < pool.length; i++) {
+      var g = pool[i];
+      if (t < g.next) continue;
+      if (g.level < 0) { respawn(g, 0); continue; }   // fully decayed → move elsewhere
+      g.el.style.visibility = "visible";
+      g.el.className = "n" + g.level;   // step the colour down the palette
+      g.el.textContent = rndGlyph();     // every colour change also changes the character
+      g.level--;
+      g.next = t + jitter(g.step);
+    }
+  }, TICK);
+
+  setTimeout(function() { location.reload(); }, Math.min(WAKE, SAFETY));
+})();
+</script>
 <meta name="viewport" content="width=1024">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
@@ -20,14 +80,14 @@
     line-height: 1.5;
   }
 
-  /* CRT softness: a gentle blur over the glyph field */
-  :root { --crt-blur: {% if crt_enabled %}{{ crt_blur }}{% else %}0{% endif %}px; }
-
   /* phosphor field: absolutely-positioned decaying glyphs */
   #field {
     position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-    -webkit-filter: blur(var(--crt-blur));
-    filter: blur(var(--crt-blur));
+{% if crt_enabled %}
+    /* CRT softness — only emitted when enabled: any filter is costly on old iPads */
+    -webkit-filter: blur({{ crt_blur }}px);
+    filter: blur({{ crt_blur }}px);
+{% endif %}
   }
   #field span {
     position: absolute;

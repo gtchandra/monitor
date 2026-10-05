@@ -1,8 +1,9 @@
 import json
 import os
 import random
+import threading
 import yaml
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from flask import Flask, render_template, send_from_directory, Response
 from fetchers import weather, news, stocks
 
@@ -95,6 +96,14 @@ def _is_quiet(hour, start, end):
     return hour >= start or hour < end
 
 
+def _ms_until_hour(now, hour):
+    """Milliseconds from `now` until the next HH:00:00 local time."""
+    target = now.replace(hour=hour, minute=0, second=0, microsecond=0)
+    if target <= now:
+        target += timedelta(days=1)
+    return int((target - now).total_seconds() * 1000)
+
+
 _static_dir = os.path.join(os.path.dirname(__file__), 'static')
 
 @app.route('/apple-touch-icon<path:suffix>.png')
@@ -139,6 +148,7 @@ def index():
             ss_fade_min=ss.get("fade_min_seconds", 6),
             ss_fade_max=ss.get("fade_max_seconds", 16),
             ss_randomness=ss.get("randomness", 0.5),
+            ss_wake_ms=_ms_until_hour(now, quiet.get("end", 6)) + 5000,   # reload just after wake hour
             crt_enabled=crt.get("enabled", True),
             crt_blur=crt.get("blur_px", 0.7),
         )
@@ -178,7 +188,19 @@ def index():
     )
 
 
+def _warm_cache():
+    # fill the fetcher caches so the first request after a restart doesn't block on upstream APIs
+    for fn in (lambda: weather.get(cfg["location"]),
+               lambda: news.get(cfg["news_feeds"], cfg.get("news_max_items", 10)),
+               lambda: stocks.get(cfg.get("stocks", []))):
+        try:
+            fn()
+        except Exception:
+            pass
+
+
 def main():
+    threading.Thread(target=_warm_cache, daemon=True).start()
     app.run(host="0.0.0.0", port=5010, debug=False)
 
 
