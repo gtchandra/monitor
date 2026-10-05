@@ -38,17 +38,12 @@ Skip newsletters, automated receipts, promos, obvious notifications, and old low
 Keep it to 1-4 bullets. If nothing needs attention, write one calm line such as: `No unread primary emails look urgent right now.`
 Do not include email addresses unless needed to disambiguate the sender.
 
-Optional sections, randomized independently each run:
+Optional section, randomized each run:
 
 ## Home and cats
 Include with 30% probability.
 Use for cat and home maintenance: litter scoop, water bowls, food level, litter area, heat/cool shade, bowls, quick vacuum.
 Keep it to 2-4 bullets.
-
-## Dinner
-Include with 30% probability.
-Suggest one simple meal suitable for the day, weather, and calendar load.
-Keep it to 1-3 lines. No recipe-blog style.
 
 Other guidance:
 - If the dashboard weather/news/stocks are useful, comment briefly only when it adds value.
