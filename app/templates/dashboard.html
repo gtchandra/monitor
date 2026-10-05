@@ -72,6 +72,12 @@
   .stock-change.up   { color: #FFB000; }
   .stock-change.down { color: #CC8800; }
 
+  /* ── system boot banner: neofetch rows + btop-style gauges ── */
+  .fetch-row { white-space: pre; font-size: 0.7em; line-height: 1.25; }
+  .fetch-gap { height: 0.9em; }   /* one blank row (at the fetch font size) before the gauges */
+  /* page-level copy of the 8-step amber palette (the glitch's nX levels) for gauge cells */
+  .g0 { color: #4D3500; } .g5 { color: #CC8D00; } .g6 { color: #E69E00; } .g7 { color: #FFB000; }
+
   /* ── home section (plain text, one line per source line) ── */
   .home-line { padding: 1px 0; min-height: 1.5em; }
 
@@ -173,6 +179,35 @@
 
 <div id="content">
 
+{# btop-style gauge: 20 cells, filled part gets "hotter" along the bar, empty track stays dim #}
+{% macro gauge(pct) -%}
+{%- set f = [[(pct / 5) | round | int, 0] | max, 20] | min -%}
+{%- for lo, lvl in [(0, 5), (5, 6), (10, 7), (15, 7)] -%}
+{%- set n = [[f - lo, 0] | max, 5] | min -%}
+{%- if n %}<span class="g{{ lvl }}">{{ '■' * n }}</span>{% endif -%}
+{%- endfor -%}
+{%- if f < 20 %}<span class="g0">{{ '■' * (20 - f) }}</span>{% endif -%}
+{%- endmacro %}
+
+<!-- SYSTEM (boot banner) -->
+{% if sysinfo and (sysinfo.fetch or sysinfo.stats) %}
+<div class="section">
+  {% if sysinfo.fetch %}
+    {% for row in sysinfo.fetch %}
+    <div class="fetch-row line" {{ delay() }}>{{ row }}</div>
+    {% endfor %}
+    <div class="fetch-gap"></div>
+  {% endif %}
+  {% if sysinfo.stats %}{% set st = sysinfo.stats %}
+    {% for pair in st.cpu | batch(2) %}{% set row = loop.index0 %}
+    <div class="fetch-row line" {{ delay() }}>{% if loop.first %}CPU  {% else %}     {% endif %}{% for p in pair %}{{ row * 2 + loop.index0 }} {{ gauge(p) }} {{ '%3d' % p }}%{% if not loop.last %}    {% endif %}{% endfor %}</div>
+    {% endfor %}
+    <div class="fetch-row line" {{ delay() }}>MEM    {{ gauge(st.mem_pct) }} {{ '%3d' % st.mem_pct }}%  {{ st.mem_used }} / {{ st.mem_total }} GB</div>
+    <div class="fetch-row line hold" {{ delay() }}>DISK   {{ gauge(st.disk_pct) }} {{ '%3d' % st.disk_pct }}%  {{ st.disk_path }}</div>
+  {% endif %}
+</div>
+{% endif %}
+
 <!-- NEWS -->
 <div class="section">
   <div class="section-title line" {{ delay() }}>news<span class="section-title-line"></span></div>
@@ -228,6 +263,7 @@
   var GLITCH_DUR = {{ glitch_duration }} * 1000;
   var GLITCH_CHURN = {{ glitch_churn }};
   var GLITCH_BLANK = {{ glitch_blank }};   // fraction of glitch cells left empty (black)
+  var HOLD_MS = {{ system_hold }} * 1000;         // pause after the system banner (".hold" line)
   var REFRESH_MS = {{ refresh_seconds }} * 1000;   // real reload (fresh data) only this often
   var HAS_TASK = {% if due_task %}true{% else %}false{% endif %};   // a chore is awaiting acknowledgement
   var LOADED_AT = new Date().getTime();
@@ -381,10 +417,14 @@
     var n = Math.min(d < MIN_TICK ? Math.ceil(MIN_TICK / d) : 1, c.text.length - pos);
     c.node.nodeValue += c.text.substr(pos, n);
     pos += n;
-    if (pos >= c.text.length) { ci++; pos = 0; }
-
     var wait = d * n;
     if (newLine) wait += LFPAUSE;
+    if (pos >= c.text.length) {
+      ci++; pos = 0;
+      // end of a ".hold" line: park the cursor there for a while before the next section
+      if (c.line && (" " + c.line.className + " ").indexOf(" hold ") !== -1 &&
+          (ci >= chunks.length || chunks[ci].line !== c.line)) wait += HOLD_MS;
+    }
     setTimeout(type, wait);
   }
 

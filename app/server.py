@@ -5,7 +5,7 @@ import threading
 import yaml
 from datetime import datetime, date, timedelta
 from flask import Flask, render_template, send_from_directory, Response
-from fetchers import weather, news, stocks
+from fetchers import weather, news, stocks, system
 
 app = Flask(__name__)
 app.jinja_env.globals['randms'] = lambda: random.uniform(0.12, 0.50)
@@ -159,6 +159,8 @@ def index():
     headlines = news.get(cfg["news_feeds"], cfg.get("news_max_items", 10))
     home_lines = _read_home()
     stock_quotes = stocks.get(cfg.get("stocks", []))
+    sys_cfg = cfg.get("system") or {}
+    sysinfo = system.get(sys_cfg.get("disk_path", "/")) if sys_cfg.get("enabled", True) else None
 
     bar_weather = f"{wx['temp_c']}°C  {wx['desc']}" if wx else "[unavailable]"
 
@@ -175,6 +177,8 @@ def index():
         headlines=headlines,
         home_lines=home_lines,
         stock_quotes=stock_quotes,
+        sysinfo=sysinfo,
+        system_hold=sys_cfg.get("hold_seconds", 5),
         typing_cps=typing.get("cps", 45),
         typing_jitter=typing.get("jitter", 0.7),
         typing_lf=typing.get("lf_pause_ms", 150),
@@ -192,7 +196,8 @@ def _warm_cache():
     # fill the fetcher caches so the first request after a restart doesn't block on upstream APIs
     for fn in (lambda: weather.get(cfg["location"]),
                lambda: news.get(cfg["news_feeds"], cfg.get("news_max_items", 10)),
-               lambda: stocks.get(cfg.get("stocks", []))):
+               lambda: stocks.get(cfg.get("stocks", [])),
+               lambda: system.get((cfg.get("system") or {}).get("disk_path", "/"))):
         try:
             fn()
         except Exception:

@@ -50,6 +50,7 @@ All settings live in `config.yaml`:
 | `stocks` | List of `{symbol, label}` tickers |
 | `typing` | Serial/telex typing-reveal animation tuning |
 | `glitch` | End-of-cycle glitch animation tuning |
+| `system` | Boot banner: neofetch + btop-style CPU/MEM/DISK gauges, then a `hold_seconds` pause |
 | `crt` | Optional blur (costly on old iPads) |
 | `quiet_hours` / `screensaver` | Night-time phosphor screensaver window and tuning |
 
@@ -62,6 +63,7 @@ All settings live in `config.yaml`:
   - `weather.py` — wttr.in JSON API
   - `news.py` — RSS via `feedparser`
   - `stocks.py` — `yfinance`
+  - `system.py` — neofetch (logo + info) and CPU/memory/disk usage from `/proc`
   - `cache.py` — shared in-memory TTL cache (stale-while-revalidate)
 - **`app/templates/dashboard.html`** — Jinja2 + CSS; staggered animations driven
   by a `randms()` Jinja2 global.

@@ -2,6 +2,12 @@ location: "Bologna"
 refresh_seconds: 900   # full page reload (fresh data) at most this often; between reloads the typing cycle replays in place
 home_md_path: "./home.md"
 
+# boot banner: neofetch + btop-style gauges at the start of each cycle
+system:
+  enabled: true
+  disk_path: "/"
+  hold_seconds: 5      # pause after the system block before the news starts typing
+
 news_feeds:
   - url: "https://feeds.bbci.co.uk/news/world/rss.xml"
     label: "BBC"
