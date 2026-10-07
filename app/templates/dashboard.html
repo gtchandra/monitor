@@ -36,6 +36,8 @@
     z-index: 10;
   }
   .bar-sep  { margin: 0 10px; }
+  /* braille spinner: fixed-width box so a fallback font can't shift the rest of the bar */
+  .spin { display: inline-block; width: 16px; margin-right: 10px; text-align: center; }
 
   /* ── section headers ── */
   .section { margin-bottom: 14px; }
@@ -381,6 +383,26 @@
       chunks.push({ node: tn, text: tn.nodeValue, line: line });
       tn.nodeValue = "";
     }
+  }
+
+  // ── braille spinner at the left of the top bar ──
+  // created after the text walk so the typing loop never touches it; one cheap timer,
+  // paused while the glitch covers the screen. Not started when a task is pending
+  // (that mode must stay completely static on the old iPad).
+  if (!HAS_TASK) {
+    var SPIN = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏", SPIN_MS = 100;
+    var bar = document.querySelector(".bar");
+    var spin = document.createElement("span");
+    spin.className = "spin";
+    var spinTxt = document.createTextNode(SPIN.charAt(0));
+    spin.appendChild(spinTxt);
+    bar.insertBefore(spin, bar.firstChild);
+    var si = 0;
+    setInterval(function() {
+      if (gEl) return;
+      si = (si + 1) % SPIN.length;
+      spinTxt.nodeValue = SPIN.charAt(si);
+    }, SPIN_MS);
   }
 
   var cur = document.createElement("span");
