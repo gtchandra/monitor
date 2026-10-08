@@ -1,6 +1,15 @@
 import feedparser
 from .cache import get as cached
 
+def _image(entry):
+    """Best image URL for an entry (None if the feed has none). BBC: ask for the 976px rendition."""
+    for key in ("media_thumbnail", "media_content"):
+        media = entry.get(key) or []
+        if media and media[0].get("url"):
+            return media[0]["url"].replace("/standard/240/", "/standard/976/")
+    return None
+
+
 def _fetch(feeds, max_items):
     items = []
     for feed in feeds:
@@ -9,7 +18,7 @@ def _fetch(feeds, max_items):
             for entry in parsed.entries[:max_items]:
                 title = entry.get("title", "").strip()
                 if title:
-                    items.append({"title": title, "label": feed.get("label", "")})
+                    items.append({"title": title, "label": feed.get("label", ""), "image": _image(entry)})
         except Exception:
             pass
     return items[:max_items]

@@ -76,7 +76,11 @@
 
   /* ── system boot banner: neofetch rows + btop-style gauges ── */
   .fetch-row { white-space: pre; font-size: 0.7em; line-height: 1.25; }
-  .fetch-gap { height: 0.9em; }   /* one blank row (at the fetch font size) before the gauges */
+  .fetch-gap { height: 0.9em; }
+  /* news "telefoto": braille rendering of the lead image, under its headline */
+  .art { margin-left: 18px; }
+  .art-first { margin-top: 6px; }
+  .art-last  { margin-bottom: 8px; }   /* one blank row (at the fetch font size) before the gauges */
   /* page-level copy of the 8-step amber palette (the glitch's nX levels) for gauge cells */
   .g0 { color: #4D3500; } .g5 { color: #CC8D00; } .g6 { color: #E69E00; } .g7 { color: #FFB000; }
 
@@ -218,6 +222,11 @@
     <div class="news-item line" {{ delay() }}>
 - {{ item.title }}
     </div>
+    {% if news_art and news_art.index == loop.index0 %}
+      {% for r in news_art.rows %}
+    <div class="fetch-row line art{% if loop.first %} art-first{% endif %}{% if loop.last %} art-last{% endif %}">{{ r }}</div>
+      {% endfor %}
+    {% endif %}
     {% endfor %}
   {% else %}
     <span class="unavailable line" {{ delay() }}>[unavailable]</span>
@@ -265,6 +274,7 @@
   var GLITCH_DUR = {{ glitch_duration }} * 1000;
   var GLITCH_CHURN = {{ glitch_churn }};
   var GLITCH_BLANK = {{ glitch_blank }};   // fraction of glitch cells left empty (black)
+  var ART_LINE_MS = {{ art_line_ms }};          // news image arrives one whole row per tick
   var HOLD_MS = {{ system_hold }} * 1000;         // pause after the system banner (".hold" line)
   var REFRESH_MS = {{ refresh_seconds }} * 1000;   // real reload (fresh data) only this often
   var HAS_TASK = {% if due_task %}true{% else %}false{% endif %};   // a chore is awaiting acknowledgement
@@ -434,13 +444,20 @@
       }
     }
 
-    // fast rates print a few characters per tick: ~25 timers/s instead of one per character
-    var d = base * (1 - JITTER + Math.random() * JITTER * 2);
-    var n = Math.min(d < MIN_TICK ? Math.ceil(MIN_TICK / d) : 1, c.text.length - pos);
+    var wait, n;
+    if (c.line && (" " + c.line.className + " ").indexOf(" art ") !== -1) {
+      // image row: the whole row lands at once, like a wirephoto scanning in
+      n = c.text.length - pos;
+      wait = ART_LINE_MS;
+    } else {
+      // fast rates print a few characters per tick: ~25 timers/s instead of one per character
+      var d = base * (1 - JITTER + Math.random() * JITTER * 2);
+      n = Math.min(d < MIN_TICK ? Math.ceil(MIN_TICK / d) : 1, c.text.length - pos);
+      wait = d * n;
+      if (newLine) wait += LFPAUSE;
+    }
     c.node.nodeValue += c.text.substr(pos, n);
     pos += n;
-    var wait = d * n;
-    if (newLine) wait += LFPAUSE;
     if (pos >= c.text.length) {
       ci++; pos = 0;
       // end of a ".hold" line: park the cursor there for a while before the next section

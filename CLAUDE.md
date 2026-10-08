@@ -28,6 +28,7 @@ No tests or linter are configured.
 - `news.py` — parses RSS feeds via `feedparser`, TTL 300 s
 - `stocks.py` — queries `yfinance`, TTL 900 s
 - `system.py` — neofetch logo + info side by side (TTL 600 s) and per-core CPU / memory / disk usage read from `/proc` (TTL 10 s); shown as a boot banner with btop-style gauges before the news, followed by a `system.hold_seconds` pause. Not included in `/feed.txt`.
+- `newsart.py` — downloads the first headline image (`news.py` adds an `image` URL; BBC upgraded to 976px) and renders it to braille rows with `chafa`. Never blocks: unknown URLs are rendered in a background thread and appear on the next load. In the template the rows are `.art` lines that the typing loop reveals one whole row per `news_image.line_ms`.
 - `cache.py` — shared TTL in-memory cache; a stale entry is returned immediately while a background thread refreshes it, and only a cold cache blocks. On fetch error the stale data is kept.
 
 **Configuration:** `config.yaml` controls location, refresh interval, `home_md_path`, news feeds, and stock symbols. `home.md` is rendered as Markdown and injected into the dashboard as the "Home" section.

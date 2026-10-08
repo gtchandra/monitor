@@ -47,6 +47,7 @@ All settings live in `config.yaml`:
 | `home_md_path` | Path to the Markdown file rendered in the Home panel |
 | `news_feeds` | List of `{url, label}` RSS feeds |
 | `news_max_items` | Max headlines shown |
+| `news_image` | "Wirephoto": first headline image as braille art (chafa), size and row speed |
 | `stocks` | List of `{symbol, label}` tickers |
 | `typing` | Serial/telex typing-reveal animation tuning |
 | `glitch` | End-of-cycle glitch animation tuning |
@@ -63,6 +64,7 @@ All settings live in `config.yaml`:
   - `weather.py` — wttr.in JSON API
   - `news.py` — RSS via `feedparser`
   - `stocks.py` — `yfinance`
+  - `newsart.py` — renders a news image to braille rows with `chafa`, in the background
   - `system.py` — neofetch (logo + info) and CPU/memory/disk usage from `/proc`
   - `cache.py` — shared in-memory TTL cache (stale-while-revalidate)
 - **`app/templates/dashboard.html`** — Jinja2 + CSS; staggered animations driven

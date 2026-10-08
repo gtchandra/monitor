@@ -5,7 +5,7 @@ import threading
 import yaml
 from datetime import datetime, date, timedelta
 from flask import Flask, render_template, send_from_directory, Response
-from fetchers import weather, news, stocks, system
+from fetchers import weather, news, stocks, system, newsart
 
 app = Flask(__name__)
 app.jinja_env.globals['randms'] = lambda: random.uniform(0.12, 0.50)
@@ -87,18 +87,38 @@ def _feed_text():
     return "\n\n".join(sections) + "\n"
 
 
-def _is_quiet(hour, start, end):
-    """True if `hour` falls in the quiet window, which may wrap past midnight."""
+def _news_art(headlines):
+    """Braille rendering of the first headline image, as {index, rows}, or None (not ready / off)."""
+    ni = cfg.get("news_image") or {}
+    if not ni.get("enabled", True):
+        return None
+    for i, h in enumerate(headlines or []):
+        if h.get("image"):
+            rows = newsart.get(h["image"], ni.get("cols", 60), ni.get("rows", 18))
+            return {"index": i, "rows": rows} if rows else None
+    return None
+
+
+def _minutes(t):
+    """Time of day as minutes since midnight: accepts 22 (hour) or "22:30"."""
+    if isinstance(t, str) and ":" in t:
+        h, m = t.split(":", 1)
+        return int(h) * 60 + int(m)
+    return int(t) * 60
+
+
+def _is_quiet(minute, start, end):
+    """True if `minute` (since midnight) falls in the quiet window, which may wrap past midnight."""
     if start == end:
         return False
     if start < end:
-        return start <= hour < end
-    return hour >= start or hour < end
+        return start <= minute < end
+    return minute >= start or minute < end
 
 
-def _ms_until_hour(now, hour):
-    """Milliseconds from `now` until the next HH:00:00 local time."""
-    target = now.replace(hour=hour, minute=0, second=0, microsecond=0)
+def _ms_until(now, minute):
+    """Milliseconds from `now` until the next occurrence of `minute` (since midnight), local time."""
+    target = now.replace(hour=minute // 60, minute=minute % 60, second=0, microsecond=0)
     if target <= now:
         target += timedelta(days=1)
     return int((target - now).total_seconds() * 1000)
@@ -140,7 +160,8 @@ def index():
 
     crt = cfg.get("crt") or {}
     quiet = cfg.get("quiet_hours") or {}
-    if quiet.get("enabled", True) and _is_quiet(now.hour, quiet.get("start", 22), quiet.get("end", 6)):
+    q_start, q_end = _minutes(quiet.get("start", 22)), _minutes(quiet.get("end", 6))
+    if quiet.get("enabled", True) and _is_quiet(now.hour * 60 + now.minute, q_start, q_end):
         ss = cfg.get("screensaver") or {}
         return render_template(
             "screensaver.html",
@@ -148,7 +169,7 @@ def index():
             ss_fade_min=ss.get("fade_min_seconds", 6),
             ss_fade_max=ss.get("fade_max_seconds", 16),
             ss_randomness=ss.get("randomness", 0.5),
-            ss_wake_ms=_ms_until_hour(now, quiet.get("end", 6)) + 5000,   # reload just after wake hour
+            ss_wake_ms=_ms_until(now, q_end) + 5000,   # reload just after wake hour
             crt_enabled=crt.get("enabled", True),
             crt_blur=crt.get("blur_px", 0.7),
         )
@@ -178,6 +199,8 @@ def index():
         home_lines=home_lines,
         stock_quotes=stock_quotes,
         sysinfo=sysinfo,
+        news_art=_news_art(headlines),
+        art_line_ms=(cfg.get("news_image") or {}).get("line_ms", 120),
         system_hold=sys_cfg.get("hold_seconds", 5),
         typing_cps=typing.get("cps", 45),
         typing_jitter=typing.get("jitter", 0.7),
@@ -195,7 +218,7 @@ def index():
 def _warm_cache():
     # fill the fetcher caches so the first request after a restart doesn't block on upstream APIs
     for fn in (lambda: weather.get(cfg["location"]),
-               lambda: news.get(cfg["news_feeds"], cfg.get("news_max_items", 10)),
+               lambda: _news_art(news.get(cfg["news_feeds"], cfg.get("news_max_items", 10))),
                lambda: stocks.get(cfg.get("stocks", [])),
                lambda: system.get((cfg.get("system") or {}).get("disk_path", "/"))):
         try:
