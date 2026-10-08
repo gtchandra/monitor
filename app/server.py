@@ -174,7 +174,7 @@ def index():
             crt_blur=crt.get("blur_px", 0.7),
         )
 
-    bar_time = now.strftime("%a %d %b %Y ■ %H:%M")
+    bar_date = now.strftime("%a %d %b %Y")
 
     wx = weather.get(cfg["location"])
     headlines = news.get(cfg["news_feeds"], cfg.get("news_max_items", 10))
@@ -190,7 +190,9 @@ def index():
 
     return render_template(
         "dashboard.html",
-        bar_time=bar_time,
+        bar_date=bar_date,
+        bar_clock=now.strftime("%H:%M"),
+        server_sod=now.hour * 3600 + now.minute * 60 + now.second,   # lets the page keep server time
         bar_weather=bar_weather,
         location=cfg["location"],
         refresh_seconds=cfg.get("refresh_seconds", 60),

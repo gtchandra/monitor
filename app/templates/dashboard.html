@@ -180,7 +180,7 @@
 
 <!-- STATUS BAR -->
 <div class="bar line" {{ delay() }}>
-  {{ bar_time }}<span class="bar-sep">■</span>{{ bar_weather }}<span class="bar-sep">■</span>{{ location }}
+  {{ bar_date }} ■ <span id="clock">{{ bar_clock }}</span><span class="bar-sep">■</span>{{ bar_weather }}<span class="bar-sep">■</span>{{ location }}
 </div>
 
 <div id="content">
@@ -279,6 +279,8 @@
   var REFRESH_MS = {{ refresh_seconds }} * 1000;   // real reload (fresh data) only this often
   var HAS_TASK = {% if due_task %}true{% else %}false{% endif %};   // a chore is awaiting acknowledgement
   var LOADED_AT = new Date().getTime();
+  var SERVER_SOD = {{ server_sod }};   // server time of day (s) at render; advanced by elapsed time,
+                                       // so the bar follows the server clock, not the iPad's
   var base = 1000 / CPS;
   var MIN_TICK = 40;   // ms; below this, print several characters per timer tick
 
@@ -467,8 +469,16 @@
     setTimeout(type, wait);
   }
 
+  // current server time as HH:MM (the page now lives up to refresh_seconds without a reload)
+  function serverClock() {
+    var t = Math.floor(SERVER_SOD + (new Date().getTime() - LOADED_AT) / 1000) % 86400;
+    var h = Math.floor(t / 3600), m = Math.floor(t / 60) % 60;
+    return (h < 10 ? "0" : "") + h + ":" + (m < 10 ? "0" : "") + m;
+  }
+
   function restartTyping() {
     for (var i = 0; i < chunks.length; i++) {
+      if (chunks[i].node.parentNode && chunks[i].node.parentNode.id === "clock") chunks[i].text = serverClock();
       chunks[i].node.nodeValue = "";
       var ln = chunks[i].line;
       if (ln) ln.className = ln.className.replace(/ on\b/g, "");
