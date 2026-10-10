@@ -20,7 +20,8 @@ _home_md_path = os.path.join(os.path.dirname(__file__), "..", cfg.get("home_md_p
 def _read_home():
     try:
         with open(_home_md_path, encoding="utf-8") as f:
-            return f.read().splitlines()
+            lines = f.read().splitlines()
+        return lines if any(ln.strip() for ln in lines) else None   # empty file → no Home section
     except Exception:
         return None
 
@@ -88,15 +89,22 @@ def _feed_text():
 
 
 def _news_art(headlines):
-    """Braille rendering of the first headline image, as {index, rows}, or None (not ready / off)."""
+    """Text-art images for the headlines that have one, as {style, rows: {index: rows}}, or None.
+
+    Images not rendered yet are started in the background and simply missing this time.
+    """
     ni = cfg.get("news_image") or {}
     if not ni.get("enabled", True):
         return None
+    style, budget, rows_by_index = ni.get("style", "blocks"), ni.get("max_images", 5), {}
     for i, h in enumerate(headlines or []):
-        if h.get("image"):
-            rows = newsart.get(h["image"], ni.get("cols", 60), ni.get("rows", 18))
-            return {"index": i, "rows": rows} if rows else None
-    return None
+        if not h.get("image") or budget <= 0:
+            continue
+        budget -= 1
+        rows = newsart.get(h["image"], ni.get("cols", 60), ni.get("rows", 18), style)
+        if rows:
+            rows_by_index[i] = rows
+    return {"style": style, "rows": rows_by_index} if rows_by_index else None
 
 
 def _minutes(t):

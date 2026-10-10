@@ -8,35 +8,13 @@ Everyone at home understands English, so always write the monitor content in Eng
 Formatting rules:
 - Use only `##` for section titles.
 - Do not use separator lines such as `---`; the next section title is already the separator.
-- Keep the file short. Target 10-20 display lines, rarely more than 25.
+- Keep the file short: a few lines at most. News is the main feature of the monitor.
 - Use simple paragraphs and simple bullet lists only.
 - The dashboard CSS renders list bullets as `]`, so normal Markdown `- item` is fine.
 - Avoid tables, links, nested lists, checkboxes, long quotes, dense Markdown, or long explanations.
 
-Always include these sections:
-
-## Today
-A very short daily orientation. Mention the shape of the day, early starts, travel, evening commitments, or one practical preparation.
-Keep it to 1-3 short lines.
-
-## Calendar tomorrow
-Use `/home/gab/.local/state/calendar/calendar.md` as the source.
-List the most relevant events for tomorrow only.
-Highlight early travel and obvious overlaps/conflicts.
-Keep event titles readable; remove organizer details and unnecessary metadata.
-
-Second daily pass only:
-
-## Email
-On the afternoon/second daily pass, include this section.
-Use `gog`, not Himalaya, to inspect Gmail unread mail.
-Query only the primary inbox, excluding updates/forums/promotions/social noise:
-`gog gmail messages search 'in:inbox category:primary is:unread' --max 10 --json --no-input --timezone Europe/Rome`
-Deduplicate by threadId when the same thread has multiple unread messages.
-Highlight only unread primary-inbox emails that look like they may require Gab's attention: important label, direct human/work senders, recent project/client messages, or subject lines implying action/follow-up.
-Skip newsletters, automated receipts, promos, obvious notifications, and old low-signal unread items.
-Keep it to 1-4 bullets. If nothing needs attention, write one calm line such as: `No unread primary emails look urgent right now.`
-Do not include email addresses unless needed to disambiguate the sender.
+The repo and the dashboard are semi-public: never include personal data — no calendar
+events, emails, names, appointments or anything read from the calendar or the inbox.
 
 Optional section, randomized each run:
 
@@ -44,6 +22,8 @@ Optional section, randomized each run:
 Include with 30% probability.
 Use for cat and home maintenance: litter scoop, water bowls, food level, litter area, heat/cool shade, bowls, quick vacuum.
 Keep it to 2-4 bullets.
+
+If no section is included this run, write an empty `home.md`; the dashboard then hides the Home section.
 
 Other guidance:
 - If the dashboard weather/news/stocks are useful, comment briefly only when it adds value.

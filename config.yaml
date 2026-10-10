@@ -2,11 +2,11 @@ location: "Bologna"
 refresh_seconds: 900   # full page reload (fresh data) at most this often; between reloads the typing cycle replays in place
 home_md_path: "./home.md"
 
-# boot banner: neofetch + btop-style gauges at the start of each cycle
+# boot screen: neofetch + btop-style gauges, shown whole after each glitch ("reboot"), then cleared
 system:
   enabled: true
   disk_path: "/"
-  hold_seconds: 5      # pause after the system block before the news starts typing
+  hold_seconds: 5      # how long the boot screen stays before the screen clears and the news starts
 
 news_feeds:
   - url: "https://feeds.bbci.co.uk/news/world/rss.xml"
@@ -15,12 +15,16 @@ news_feeds:
     label: "HN"
 news_max_items: 5
 
-# "telefoto": the first BBC headline image as braille art, arriving one row at a time
+# "telefoto": each headline's image (BBC has them, HN doesn't) as amber text art above its
+# headline, arriving one row at a time
 news_image:
   enabled: true
   cols: 60
   rows: 18
-  line_ms: 120     # delay between image rows
+  max_images: 5    # at most this many pictures per page (each adds ~260 px and ~600 coloured spans)
+  line_ms: 240     # delay between image rows
+  style: blocks    # braille = 1-tone teleprinter look | braille_tones = braille in 9 amber tones
+                   # blocks = half blocks with tones (2 pixels per cell, most recognizable)
 
 stocks:
   - symbol: "ASML"
@@ -56,7 +60,7 @@ glitch:
 # night-time quiet hours: dashboard activity stops, phosphor-decay screensaver runs
 quiet_hours:
   enabled: true
-  start: "22:30"        # when the screensaver switches on: hour (22) or "HH:MM" — quote it, YAML reads 22:30 as a number
+  start: "23:00"        # when the screensaver switches on: hour (22) or "HH:MM" — quote it, YAML reads 22:30 as a number
   end: 6                # when it switches back to the dashboard (wraps past midnight)
 
 # "phosphor decay" screensaver: random glyphs fade brightest→darkest through the amber palette

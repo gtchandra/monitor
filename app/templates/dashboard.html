@@ -77,10 +77,20 @@
   /* ── system boot banner: neofetch rows + btop-style gauges ── */
   .fetch-row { white-space: pre; font-size: 0.7em; line-height: 1.25; }
   .fetch-gap { height: 0.9em; }
+  /* boot screen (neofetch + gauges): printed at once after each glitch, then cleared */
+  #boot { display: none; }
   /* news "telefoto": braille rendering of the lead image, under its headline */
   .art { margin-left: 18px; }
-  .art-first { margin-top: 6px; }
-  .art-last  { margin-bottom: 8px; }   /* one blank row (at the fetch font size) before the gauges */
+  .art-blocks { line-height: 1; }   /* half-block rows touch, so the picture is continuous */
+  /* 9 amber tones for the image: tN = glyph colour, uN = cell background (0 = black) */
+  .t0 { color: #000; }    .t1 { color: #4D3500; } .t2 { color: #664600; }
+  .t3 { color: #805800; } .t4 { color: #996A00; } .t5 { color: #B37B00; }
+  .t6 { color: #CC8D00; } .t7 { color: #E69E00; } .t8 { color: #FFB000; }
+  .u0 { background: #000; }    .u1 { background: #4D3500; } .u2 { background: #664600; }
+  .u3 { background: #805800; } .u4 { background: #996A00; } .u5 { background: #B37B00; }
+  .u6 { background: #CC8D00; } .u7 { background: #E69E00; } .u8 { background: #FFB000; }
+  .art-first { margin-top: 14px; }   /* picture first, its headline right below as a caption */
+  .art-last  { margin-bottom: 4px; }   /* one blank row (at the fetch font size) before the gauges */
   /* page-level copy of the 8-step amber palette (the glitch's nX levels) for gauge cells */
   .g0 { color: #4D3500; } .g5 { color: #CC8D00; } .g6 { color: #E69E00; } .g7 { color: #FFB000; }
 
@@ -195,21 +205,21 @@
 {%- if f < 20 %}<span class="g0">{{ '■' * (20 - f) }}</span>{% endif -%}
 {%- endmacro %}
 
-<!-- SYSTEM (boot banner) -->
+<!-- SYSTEM (boot screen: shown whole, never typed; see boot() in the script) -->
 {% if sysinfo and (sysinfo.fetch or sysinfo.stats) %}
-<div class="section">
+<div id="boot" class="section">
   {% if sysinfo.fetch %}
     {% for row in sysinfo.fetch %}
-    <div class="fetch-row line" {{ delay() }}>{{ row }}</div>
+    <div class="fetch-row">{{ row }}</div>
     {% endfor %}
     <div class="fetch-gap"></div>
   {% endif %}
   {% if sysinfo.stats %}{% set st = sysinfo.stats %}
     {% for pair in st.cpu | batch(2) %}{% set row = loop.index0 %}
-    <div class="fetch-row line" {{ delay() }}>{% if loop.first %}CPU  {% else %}     {% endif %}{% for p in pair %}{{ row * 2 + loop.index0 }} {{ gauge(p) }} {{ '%3d' % p }}%{% if not loop.last %}    {% endif %}{% endfor %}</div>
+    <div class="fetch-row">{% if loop.first %}CPU  {% else %}     {% endif %}{% for p in pair %}{{ row * 2 + loop.index0 }} {{ gauge(p) }} {{ '%3d' % p }}%{% if not loop.last %}    {% endif %}{% endfor %}</div>
     {% endfor %}
-    <div class="fetch-row line" {{ delay() }}>MEM    {{ gauge(st.mem_pct) }} {{ '%3d' % st.mem_pct }}%  {{ st.mem_used }} / {{ st.mem_total }} GB</div>
-    <div class="fetch-row line hold" {{ delay() }}>DISK   {{ gauge(st.disk_pct) }} {{ '%3d' % st.disk_pct }}%  {{ st.disk_path }}</div>
+    <div class="fetch-row">MEM    {{ gauge(st.mem_pct) }} {{ '%3d' % st.mem_pct }}%  {{ st.mem_used }} / {{ st.mem_total }} GB</div>
+    <div class="fetch-row">DISK   {{ gauge(st.disk_pct) }} {{ '%3d' % st.disk_pct }}%  {{ st.disk_path }}</div>
   {% endif %}
 </div>
 {% endif %}
@@ -219,14 +229,14 @@
   <div class="section-title line" {{ delay() }}>news<span class="section-title-line"></span></div>
   {% if headlines %}
     {% for item in headlines %}
+    {% if news_art and loop.index0 in news_art.rows %}
+      {% for r in news_art.rows[loop.index0] %}
+    <div class="fetch-row line art art-{{ news_art.style }}{% if loop.first %} art-first{% endif %}{% if loop.last %} art-last{% endif %}">{% for text, cls in r %}{% if cls %}<span class="{{ cls }}">{{ text }}</span>{% else %}{{ text }}{% endif %}{% endfor %}</div>
+      {% endfor %}
+    {% endif %}
     <div class="news-item line" {{ delay() }}>
 - {{ item.title }}
     </div>
-    {% if news_art and news_art.index == loop.index0 %}
-      {% for r in news_art.rows %}
-    <div class="fetch-row line art{% if loop.first %} art-first{% endif %}{% if loop.last %} art-last{% endif %}">{{ r }}</div>
-      {% endfor %}
-    {% endif %}
     {% endfor %}
   {% else %}
     <span class="unavailable line" {{ delay() }}>[unavailable]</span>
@@ -245,9 +255,9 @@
   {% endif %}
 </div>
 
-<!-- HOME -->
+<!-- HOME (hidden entirely when home.md is empty) -->
+{% if home_lines %}
 <div class="section">
-  {% if home_lines %}
     {% for ln in home_lines %}
     {% if ln.lstrip().startswith('#') %}
     <div class="section-title line" {{ delay() }}>{{ ln.lstrip('# ').rstrip() }}<span class="section-title-line"></span></div>
@@ -255,10 +265,8 @@
     <div class="home-line line" {{ delay() }}>{{ ln }}</div>
     {% endif %}
     {% endfor %}
-  {% else %}
-    <span class="unavailable line" {{ delay() }}>[no data — write to home.md]</span>
-  {% endif %}
 </div>
+{% endif %}
 
 </div><!-- /#content -->
 
@@ -275,7 +283,8 @@
   var GLITCH_CHURN = {{ glitch_churn }};
   var GLITCH_BLANK = {{ glitch_blank }};   // fraction of glitch cells left empty (black)
   var ART_LINE_MS = {{ art_line_ms }};          // news image arrives one whole row per tick
-  var HOLD_MS = {{ system_hold }} * 1000;         // pause after the system banner (".hold" line)
+  var HOLD_MS = {{ system_hold }} * 1000;         // how long the boot screen stays before "clear screen"
+  var bootEl = document.getElementById("boot");
   var REFRESH_MS = {{ refresh_seconds }} * 1000;   // real reload (fresh data) only this often
   var HAS_TASK = {% if due_task %}true{% else %}false{% endif %};   // a chore is awaiting acknowledgement
   var LOADED_AT = new Date().getTime();
@@ -386,6 +395,7 @@
       if (!tn.nodeValue.replace(/\s/g, "").length) continue;                  // skip whitespace-only
       var p = tn.parentNode;
       if (p && (p.nodeName === "SCRIPT" || p.nodeName === "STYLE")) continue;  // skip our own code
+      if (bootEl && bootEl.contains(tn)) continue;                              // boot screen is never typed
       // climb to the nearest ancestor carrying the "line" class (past classless h2/p/ul/li)
       var line = p;
       while (line && line.nodeType === 1 && (" " + (line.className || "") + " ").indexOf(" line ") === -1) {
@@ -448,8 +458,15 @@
 
     var wait, n;
     if (c.line && (" " + c.line.className + " ").indexOf(" art ") !== -1) {
-      // image row: the whole row lands at once, like a wirephoto scanning in
-      n = c.text.length - pos;
+      // image row: the whole row lands at once, like a wirephoto scanning in. A toned row is
+      // many coloured spans (one text node each), so fill them all in this single tick.
+      while (ci + 1 < chunks.length && chunks[ci + 1].line === c.line) {
+        c.node.nodeValue = c.text;
+        ci++; c = chunks[ci];
+      }
+      c.node.parentNode.insertBefore(cur, c.node.nextSibling);
+      pos = 0;
+      n = c.text.length;
       wait = ART_LINE_MS;
     } else {
       // fast rates print a few characters per tick: ~25 timers/s instead of one per character
@@ -460,12 +477,7 @@
     }
     c.node.nodeValue += c.text.substr(pos, n);
     pos += n;
-    if (pos >= c.text.length) {
-      ci++; pos = 0;
-      // end of a ".hold" line: park the cursor there for a while before the next section
-      if (c.line && (" " + c.line.className + " ").indexOf(" hold ") !== -1 &&
-          (ci >= chunks.length || chunks[ci].line !== c.line)) wait += HOLD_MS;
-    }
+    if (pos >= c.text.length) { ci++; pos = 0; }
     setTimeout(type, wait);
   }
 
@@ -476,6 +488,18 @@
     return (h < 10 ? "0" : "") + h + ":" + (m < 10 ? "0" : "") + m;
   }
 
+  // "reboot": the boot screen appears whole, stays HOLD_MS, then clear screen and continue
+  function boot(next) {
+    if (!bootEl) { next(); return; }
+    bootEl.style.display = "block";
+    window.scrollTo(0, 0);
+    setTimeout(function() {
+      bootEl.style.display = "none";
+      window.scrollTo(0, 0);
+      next();
+    }, HOLD_MS);
+  }
+
   function restartTyping() {
     for (var i = 0; i < chunks.length; i++) {
       if (chunks[i].node.parentNode && chunks[i].node.parentNode.id === "clock") chunks[i].text = serverClock();
@@ -484,8 +508,7 @@
       if (ln) ln.className = ln.className.replace(/ on\b/g, "");
     }
     ci = 0; pos = 0; lastLine = null;
-    window.scrollTo(0, 0);
-    type();
+    boot(type);
   }
 
   if (HAS_TASK) {
@@ -499,7 +522,7 @@
       if ((" " + lns[li].className + " ").indexOf(" on ") === -1) lns[li].className += " on";
     }
   } else {
-    type();
+    boot(type);
   }
 })();
 </script>
